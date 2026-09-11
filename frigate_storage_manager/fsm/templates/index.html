@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Frigate Storage Manager</title>
+  <link rel="stylesheet" href="static/style.css">
+  <script defer src="static/app.js"></script>
+</head>
+<body>
+<main>
+  <header><span class="eyebrow">HOME ASSISTANT · STORAGE</span><h1>Frigate Storage Manager</h1>
+    <p>Understand your storage. Preview a cleanup without interrupting Frigate.</p></header>
+  <aside class="notice"><strong>Read-only validation release · 0.1.0</strong>
+    <p>Deletion and recovery mutations are locked until this HAOS installation is validated.
+       Previews keep Frigate running and preserve its configuration.</p></aside>
+  <div id="error" role="alert" hidden></div>
+  <section aria-labelledby="connection-title">
+    <h2 id="connection-title">1. Connect to Frigate</h2>
+    <div class="controls"><label>Frigate app<select id="target"><option value="">Select an installation</option></select></label>
+      <button id="validate">Validate connection</button><button id="probe" class="secondary" disabled>Test write access</button></div>
+    <p id="connection" role="status">Discovering installed Frigate apps…</p>
+    <div class="storage" id="storage" hidden>
+      <div><span>Media used</span><strong id="used">—</strong></div>
+      <div><span>Media free</span><strong id="free">—</strong></div>
+      <div><span>Media total</span><strong id="total">—</strong></div>
+    </div>
+    <details><summary>Validation details</summary><pre id="diagnostics">No validation yet.</pre>
+      <p>Your HA user ID: <code id="user"></code>. An administrator can add it to this app’s
+        <code>admin_user_ids</code> option to permit disposable write probes. Probes create and remove
+        a tiny temporary file in the selected media and database directories.</p></details>
+  </section>
+  <section aria-labelledby="preview-title">
+    <h2 id="preview-title">2. Preview old history</h2>
+    <form id="preview-form">
+      <label>Cameras <select id="cameras" multiple size="4" required aria-describedby="camera-help"></select></label>
+      <p class="hint" id="camera-help">Historical cameras are included. Use Ctrl/Cmd to select multiple cameras.</p>
+      <div class="controls"><label>Cutoff method<select id="method"><option value="days">Older than days</option><option value="date">Specific date and time</option></select></label>
+        <label id="days-label">Days<input id="days" type="number" min="1" max="36500" value="30" required></label>
+        <label id="date-label" hidden>Local date and time<input id="date" type="datetime-local"></label></div>
+      <p class="hint" id="boundary"></p>
+      <label class="check"><input id="exports" type="checkbox"> Include completed exports, using their creation time</label>
+      <p class="hint">Bookmarks, linked history, unfinished items, required footage and in-progress exports are preserved.</p>
+      <button id="preview" type="submit" disabled>Preview cleanup</button>
+    </form>
+  </section>
+  <section id="result-section" hidden aria-labelledby="result-title">
+    <h2 id="result-title">3. Review the selection</h2>
+    <p id="scope"></p><div class="estimate"><strong id="recoverable"></strong><span>estimated media bytes recoverable</span></div>
+    <div class="columns"><div><h3>Selected for cleanup</h3><dl id="counts"></dl></div><div><h3>Preserved</h3><dl id="preserved"></dl></div></div>
+    <p class="hint">Only completed items ending strictly before the cutoff are eligible. Segments touching or crossing it are kept.
+      Storage-side snapshots or retention can delay any increase in free space.</p>
+    <button id="delete" class="danger" disabled>Delete selected history</button><span class="hint" id="delete-help"> Disabled pending live validation.</span>
+  </section>
+  <section aria-labelledby="jobs-title"><h2 id="jobs-title">Jobs and recovery</h2><div id="jobs">No cleanup jobs.</div>
+    <p class="hint">Jobs survive closing this page. An interrupted job blocks further cleanup until recovered.
+      Metadata backups cannot restore deleted video. Up to five backups are retained; removal is explicit.</p></section>
+  <footer>Frigate Storage Manager · Local database, existing NFS media · No video processing</footer>
+</main>
+</body>
+</html>

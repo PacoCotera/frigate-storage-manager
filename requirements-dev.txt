@@ -1,0 +1,6 @@
+-r frigate_storage_manager/requirements.txt
+pytest==8.4.2
+ruff==0.13.0
+PyYAML==6.0.2
+peewee==3.18.2
+peewee-migrate==1.13.0
