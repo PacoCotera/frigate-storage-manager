@@ -1,13 +1,13 @@
 # Frigate Storage Manager
 
-An independent Home Assistant OS app for validating Frigate storage and previewing
-coherent cleanup of old recordings and associated history, without changing retention.
+An independent Home Assistant OS app for previewing and deleting Frigate recordings
+and associated history, without changing retention. Includes a separate full reset.
 
-**0.1.4 is an experimental, installable validation release. Deletion is disabled in
-the shipped code. Live discovery, NFS validation and read-only previews have worked;
-write access, lifecycle control, cleanup and recovery remain unvalidated on HAOS.**
-The full cleanup/recovery engine is implemented and tested with synthetic media and
-SQLite databases. Delivery and live evidence remain tracked in [issue #1](https://github.com/PacoCotera/frigate-storage-manager/issues/1).
+**0.2.0 enables experimental cleanup and full reset for explicitly authorized users.**
+Live discovery, NFS validation and previews have worked, and the operator has authorized
+the first destructive test. Write access, lifecycle, cleanup and recovery are tested
+with synthetic media/databases but remain unvalidated on the real HAOS installation.
+Delivery and live evidence remain tracked in [issue #1](https://github.com/PacoCotera/frigate-storage-manager/issues/1).
 
 ## Install
 
@@ -29,6 +29,15 @@ from this repository; no registry image is required.
 4. Review selected footage duration, recording time ranges, estimated space and
    what stays for each camera. Individual records are optional technical details.
    Reopening the page retrieves your active or saved preview.
+5. For deletion, add your HA user ID to this app's `admin_user_ids`, restart the
+   manager, and disable Frigate's Start on boot, Watchdog and Auto update. Validate
+   again, create a fresh preview and confirm **Delete selected history**.
+
+**Clear everything…** is a separate action. It ignores camera/date filters and
+deletes all cameras' recordings, clips and exports, plus the local `frigate.db` and
+SQLite sidecars. This intentionally removes bookmarks, history and Frigate database
+users. Review the exact target and type `DELETE ALL FRIGATE DATA`. Configuration,
+models and Home Assistant stay intact. Frigate creates a fresh database on restart.
 
 Frigate continues recording/detection during previews. Read the
 [installation guide and live checklist](frigate_storage_manager/DOCS.md).
@@ -46,7 +55,8 @@ The manifest requests `media` and `all_addon_configs` mappings plus Supervisor's
 are restricted to the explicitly selected Frigate directory. The default database
 is `frigate.db`, and its configured relative path must match Frigate's effective
 `/config/...` path. Writable mappings support explicit disposable probes and the
-future maintenance release. Existing media/database mutations remain release-locked.
+maintenance operations. The user allowlist is empty by default; every deletion needs
+a user-bound, one-use confirmation and fresh runtime checks.
 
 Ingress accepts only Supervisor's gateway and authenticated user identity. Write
 probes require a configured user-ID allowlist and CSRF token. No host port is exposed.
@@ -60,11 +70,17 @@ exports are optional and use creation time. Bookmarks protect linked event/revie
 groups, and active history, padded footage, trigger references and in-progress exports
 are preserved. Unknown schemas, missing indexed files and unsafe paths block cleanup.
 
-After confirmation, the offline engine pauses only the selected Frigate app,
+For selected-history cleanup, the offline engine pauses only the selected Frigate app,
 recalculates and rejects expanded scope, backs up metadata on NFS, stages files on
 the same filesystem, and commits metadata with an in-transaction witness. Recovery
 restores staging before commit or finishes deletion after commit. Ambiguity leaves
 Frigate stopped. The worker continues independently of the browser.
+
+Full reset stages the three Frigate media directories on NFS and SQLite files locally
+by rename, validates the staged tree without loading it into RAM, then commits an
+explicit durable reset marker before permanent removal. Recovery restores everything
+before that marker, or finishes reset after it. The reset has no archive item cap;
+large archives can take substantial time with Frigate stopped.
 
 **A database backup cannot restore successfully deleted videos.** Read
 [recovery and backup lifecycle](docs/recovery.md). Up to five backups are retained;

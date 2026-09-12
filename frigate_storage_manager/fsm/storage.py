@@ -186,16 +186,42 @@ def probe_directory(root):
     root = safe_path(root)
     name = ".fsm-probe-" + secrets.token_hex(16)
     path = root / name
-    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    renamed = name + "-renamed"
+    fd = os.open(
+        path,
+        os.O_RDWR
+        | os.O_CREAT
+        | os.O_EXCL
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_BINARY", 0),
+        0o600,
+    )
+    owned = os.fstat(fd)
     try:
-        os.write(fd, b"fsm-access-probe\n")
-        os.fsync(fd)
-        os.lseek(fd, 0, os.SEEK_SET)
-        if os.read(fd, 64) != b"fsm-access-probe\n":
-            raise Blocked("Disposable write probe did not read back correctly")
+        try:
+            os.write(fd, b"fsm-access-probe\n")
+            os.fsync(fd)
+            os.lseek(fd, 0, os.SEEK_SET)
+            if os.read(fd, 64) != b"fsm-access-probe\n":
+                raise Blocked("Disposable write probe did not read back correctly")
+        finally:
+            os.close(fd)
+        identity = file_identity(path)
+        if (identity["dev"], identity["ino"]) != (owned.st_dev, owned.st_ino):
+            raise Blocked("Disposable probe was replaced")
+        move_file(root, name, renamed, identity)
+        if safe_path(root, renamed).read_bytes() != b"fsm-access-probe\n":
+            raise Blocked("Renamed disposable probe did not read back correctly")
     finally:
-        os.close(fd)
-        path.unlink()
+        # Only our exclusive-create file can be removed, even if rename/fsync
+        # failed after the directory entry moved. Never touch existing media.
+        for rel in (name, renamed):
+            candidate = safe_path(root, rel, exists=False)
+            if candidate.exists():
+                identity = file_identity(candidate)
+                if (identity["dev"], identity["ino"]) != (owned.st_dev, owned.st_ino):
+                    raise Blocked("Disposable probe path changed; refusing to remove it")
+                unlink_file(root, rel, identity)
         sync_dir(root)
 
 

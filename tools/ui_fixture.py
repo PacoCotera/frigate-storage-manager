@@ -1,7 +1,7 @@
 """Local UI QA server with freshly generated synthetic files only; not in image.
 
 Run from the repo: PYTHONPATH=frigate_storage_manager:tests python tools/ui_fixture.py
-This simulates ingress solely for the disposable fake installation, with deletion locked.
+This simulates ingress solely for the disposable fake installation.
 """
 
 import argparse
@@ -19,6 +19,13 @@ from fsm.web import create_app
 from waitress import serve
 
 parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--cleanup", action="store_true", help="Authorize synthetic cleanup in the UI")
+parser.add_argument(
+    "--unsafe-boot", action="store_true", help="Show required Frigate setting changes"
+)
+parser.add_argument(
+    "--cleanup-delay", type=float, default=0, help="Delay synthetic cleanup/reset phases"
+)
 parser.add_argument("--storage-error", action="store_true", help="Show synthetic mount diagnostics")
 parser.add_argument(
     "--many-recordings",
@@ -38,6 +45,16 @@ args = parser.parse_args()
 
 with tempfile.TemporaryDirectory(prefix="fsm-ui-") as temp:
     data = fixture.__wrapped__(Path(temp))
+    if args.cleanup:
+        data.installation.options["admin_user_ids"] = ["fixture-admin"]
+    if args.unsafe_boot:
+        data.supervisor.app.update(boot="auto", watchdog=True, auto_update=True)
+    if args.cleanup_delay:
+        data.engine.hook = (
+            lambda phase: time.sleep(args.cleanup_delay)
+            if phase in ("stopped", "reset_ready")
+            else None
+        )
     recording(data)
     event(data)
     review(data, events=["e-old"])

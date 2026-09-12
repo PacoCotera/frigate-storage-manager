@@ -1,6 +1,6 @@
-"""Frigate Storage Manager. No maintenance is enabled in the 0.1.4 release."""
+"""Frigate Storage Manager: experimental, explicitly confirmed maintenance."""
 
-VERSION = "0.1.4"
-# Deliberately not an environment variable, Supervisor option, or browser setting.
-# Enabling requires a reviewed release after the live validation in issue #1.
-DESTRUCTIVE_ENABLED = False
+VERSION = "0.2.0"
+# Live ingress/discovery/preview access is established and the operator has
+# authorized a first cleanup. Allowlist, confirmation and runtime checks remain.
+DESTRUCTIVE_ENABLED = True

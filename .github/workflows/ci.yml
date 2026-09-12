@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/test_time.mjs tests/test_overview.mjs
+      - run: node --test tests/test_time.mjs tests/test_overview.mjs tests/test_maintenance.mjs
       - run: python -m pytest -q --junitxml=test-results.xml
       - uses: actions/upload-artifact@v4
         if: always()
@@ -53,11 +53,11 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build the same amd64 context Supervisor installs
         run: docker build --platform linux/amd64 --tag fsm:ci frigate_storage_manager
-      - name: Verify runtime dependencies and locked gate in image
+      - name: Verify runtime dependencies and maintenance release in image
         run: >-
           docker run --rm --entrypoint python fsm:ci -c
           "import sqlite3; from fsm import DESTRUCTIVE_ENABLED; from fsm.database import load_vectors;
-          from fsm.web import create_app; assert not DESTRUCTIVE_ENABLED;
+          from fsm.web import create_app; assert DESTRUCTIVE_ENABLED;
           db=sqlite3.connect(':memory:'); load_vectors(db); print(db.execute('select vec_version()').fetchone())"
       - name: Boot the app and verify ingress isolation
         shell: bash

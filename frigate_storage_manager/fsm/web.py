@@ -6,6 +6,7 @@ import mimetypes
 import secrets
 import threading
 import time
+from contextlib import contextmanager
 
 from flask import Flask, g, jsonify, render_template, request
 from werkzeug.exceptions import HTTPException
@@ -15,6 +16,7 @@ from .database import connect, validate_schema
 from .jobs import TERMINAL
 from .planner import camera_names
 from .previews import PreviewService
+from .reset import RESET_PHRASE, prepare_reset
 from .safety import Blocked, identifier
 from .storage import StorageBlocked, probe_directory
 
@@ -93,6 +95,16 @@ def create_app(installation, storage, store, engine):
         if any(j["phase"] not in TERMINAL for j in store.jobs()):
             raise Blocked("Resolve the interrupted/active job before a new validation or preview")
 
+    @contextmanager
+    def preparation():
+        if not engine.lock.acquire(blocking=False):
+            raise Blocked("Wait for the active maintenance worker")
+        try:
+            idle()
+            yield
+        finally:
+            engine.lock.release()
+
     @app.get("/")
     def index():
         return render_template("index.html", version=VERSION)
@@ -117,6 +129,11 @@ def create_app(installation, storage, store, engine):
                     "backup",
                     "backup_removed",
                     "completed_at",
+                    "created",
+                    "phase_started",
+                    "kind",
+                    "scanned_files",
+                    "reset_bytes",
                 )
                 if k in j
             }
@@ -132,6 +149,7 @@ def create_app(installation, storage, store, engine):
             recovery_required=any(j["phase"] not in TERMINAL for j in jobs),
             previews=previews.recent(g.user),
             preview_busy=previews.busy(),
+            worker_active=engine.lock.locked(),
         )
 
     @app.get("/api/discovery")
@@ -155,6 +173,9 @@ def create_app(installation, storage, store, engine):
         finally:
             db.close()
         own = installation.supervisor.info("self")
+        blockers = installation.maintenance_blockers(info)
+        if evidence["read_only"]:
+            blockers.append("NFS media is read-only; writable access is required for cleanup.")
         return jsonify(
             target=slug,
             version=info["version"],
@@ -174,20 +195,25 @@ def create_app(installation, storage, store, engine):
                 "auto_update": info.get("auto_update"),
             },
             write_access="Not tested; use the disposable probe if authorized",
+            maintenance={
+                "ready": not blockers,
+                "blockers": blockers,
+                "access_check": "Write, rename and delete probes run again before Frigate stops.",
+            },
         )
 
     @app.post("/api/probe")
     def probe():
         administrator()
-        idle()
-        slug = identifier(request.json.get("target"))
-        _, db, _, _ = installation.resolve(slug)
-        storage.probe()
-        probe_directory(db.parent)
+        with preparation():
+            slug = identifier(request.json.get("target"))
+            _, db, _, _ = installation.resolve(slug)
+            storage.probe()
+            probe_directory(db.parent)
         return jsonify(
             media_write=True,
             database_directory_write=True,
-            message="Disposable probes removed. Existing media and database rows were not modified.",
+            message="Write, read, rename and delete checks passed in the media and database directories. Temporary files removed; existing media and database rows unchanged.",
         )
 
     @app.post("/api/preview")
@@ -230,6 +256,34 @@ def create_app(installation, storage, store, engine):
             raise Blocked("Deletion is release-locked until real HAOS validation is complete")
         return jsonify(
             engine.submit(request.json.get("preview_id"), g.user, request.json.get("confirmation"))
+        ), 202
+
+    @app.post("/api/reset/prepare")
+    def reset_prepare():
+        administrator()
+        if not DESTRUCTIVE_ENABLED:
+            raise Blocked("Reset is disabled in this release")
+        with preparation():
+            return jsonify(
+                prepare_reset(
+                    installation, storage, store, identifier(request.json.get("target")), g.user
+                )
+            )
+
+    @app.post("/api/reset")
+    def reset():
+        administrator()
+        if not DESTRUCTIVE_ENABLED:
+            raise Blocked("Reset is disabled in this release")
+        if request.json.get("phrase") != RESET_PHRASE:
+            raise Blocked(f"Type {RESET_PHRASE} to confirm removal of all media and the database")
+        return jsonify(
+            engine.submit(
+                request.json.get("preview_id"),
+                g.user,
+                request.json.get("confirmation"),
+                kind="reset",
+            )
         ), 202
 
     @app.post("/api/recover")

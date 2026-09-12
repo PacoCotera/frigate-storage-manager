@@ -8,7 +8,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_manifest_supported_mappings_ingress_and_permissions():
     config = yaml.safe_load((ROOT / "frigate_storage_manager/config.yaml").read_text())
-    assert config["version"] == VERSION == "0.1.4"
+    assert config["version"] == VERSION == "0.2.0"
     assert config["arch"] == ["amd64"]
     assert config["ingress"] and config["panel_admin"]
     assert config["hassio_role"] == "manager" and config["hassio_api"]
@@ -16,7 +16,8 @@ def test_manifest_supported_mappings_ingress_and_permissions():
     assert not any(
         config.get(k) for k in ("host_network", "docker_api", "full_access", "privileged", "ports")
     )
-    assert not DESTRUCTIVE_ENABLED
+    assert DESTRUCTIVE_ENABLED
+    assert config["options"]["admin_user_ids"] == []
     assert not any("enable" in k or "destructive" in k for k in config["options"])
     repo = yaml.safe_load((ROOT / "repository.yaml").read_text())
     assert repo["url"] == "https://github.com/PacoCotera/frigate-storage-manager"

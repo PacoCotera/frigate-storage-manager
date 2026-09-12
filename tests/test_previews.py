@@ -202,7 +202,8 @@ def test_worker_start_failure_releases_slot_and_leaves_durable_error(env, monkey
     assert service.recent("admin")[0]["state"] == "failed"
 
 
-def test_item_api_filters_identity_and_release_gate(env):
+def test_item_api_filters_identity_and_release_gate(env, monkeypatch):
+    monkeypatch.setattr("fsm.web.DESTRUCTIVE_ENABLED", False)
     recording(env)
     c, headers = client(env)
     task = c.post("/api/preview", json=request(), headers=headers).json
@@ -221,7 +222,7 @@ def test_item_api_filters_identity_and_release_gate(env):
 
 
 def test_inspected_preview_remains_compatible_with_offline_cleanup(env):
-    # The production HTTP gate remains off. Only this synthetic engine is enabled.
+    # The retained inspection must not alter the frozen cleanup authorization.
     recording(env)
     service = PreviewService(env.installation, env.storage, env.store)
     task = complete(service, service.submit(request(), "admin"))

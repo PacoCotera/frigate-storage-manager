@@ -34,7 +34,7 @@ def engine_for(root):
 
 
 if __name__ == "__main__":
-    root, phase, token, signature = sys.argv[1:]
+    root, phase, token, signature = sys.argv[1:5]
     engine = engine_for(Path(root))
 
     def crash(value):
@@ -42,5 +42,11 @@ if __name__ == "__main__":
             os._exit(77)  # No Python cleanup, DB.close(), rollback or finally runs.
 
     engine.hook = crash
-    engine.submit(token, "admin", signature, background=False)
+    engine.submit(
+        token,
+        "admin",
+        signature,
+        background=False,
+        kind=sys.argv[5] if len(sys.argv) > 5 else "cleanup",
+    )
     raise AssertionError("Crash phase was not reached")

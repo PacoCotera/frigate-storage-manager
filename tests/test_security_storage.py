@@ -21,7 +21,8 @@ def client(env, user="admin"):
     return c, {"X-FSM-CSRF": status["csrf"]}
 
 
-def test_ingress_validation_preview_and_disabled_delete(env):
+def test_ingress_validation_preview_and_disabled_delete(env, monkeypatch):
+    monkeypatch.setattr("fsm.web.DESTRUCTIVE_ENABLED", False)
     recording(env)
     c, headers = client(env)
     assert c.get("/").status_code == 200

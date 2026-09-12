@@ -66,7 +66,7 @@ class JobStore:
             db.execute("INSERT INTO previews VALUES (?,?,?,?)", (token, user, time.time(), raw))
         return token
 
-    def reserve(self, token, user, confirmation):
+    def reserve(self, token, user, confirmation, *, kind="cleanup"):
         import json
 
         with self.connect() as db:
@@ -93,6 +93,8 @@ class JobStore:
             if not row or row[0] != user or row[1] < time.time() - 900:
                 raise Blocked("Preview expired, was already used, or belongs to another user")
             document = json.loads(row[2])
+            if document.get("kind", "cleanup") != kind:
+                raise Blocked("Confirmation belongs to a different operation")
             if confirmation != digest(document):
                 raise Blocked("Confirmation does not match the frozen preview")
             job = {
@@ -101,6 +103,7 @@ class JobStore:
                 "target": document["target"],
                 "created": time.time(),
                 "summary": summary(document["plan"]),
+                "kind": kind,
             }
             db.execute("INSERT INTO jobs VALUES (?,?,?)", (token, time.time(), json.dumps(job)))
             db.execute("DELETE FROM previews WHERE id=?", (token,))
@@ -157,10 +160,11 @@ class Engine:
 
     def phase(self, job, phase):
         job["phase"] = phase
+        job["phase_started"] = time.time()
         self.store.save(job)
         self.hook(phase)
 
-    def submit(self, token, user, confirmation, *, background=True):
+    def submit(self, token, user, confirmation, *, background=True, kind="cleanup"):
         if not self.gate():
             raise Blocked(
                 "Deletion is disabled pending live HAOS validation and a reviewed release"
@@ -168,7 +172,7 @@ class Engine:
         if not self.lock.acquire(blocking=False):
             raise Blocked("A maintenance worker is already active")
         try:
-            job, document = self.store.reserve(token, user, confirmation)
+            job, document = self.store.reserve(token, user, confirmation, kind=kind)
         except BaseException:
             self.lock.release()
             raise
@@ -180,7 +184,17 @@ class Engine:
                 self.lock.release()
 
         if background:
-            threading.Thread(target=worker, name="cleanup", daemon=False).start()
+            try:
+                threading.Thread(target=worker, name="cleanup", daemon=False).start()
+            except Exception:
+                # Reservation consumed the preview, but no worker/lifecycle IO
+                # started. Leave a resolved receipt and release the mutex.
+                try:
+                    job["error"] = "Could not start the cleanup worker; create a fresh preview."
+                    self.phase(job, "rejected")
+                finally:
+                    self.lock.release()
+                raise Blocked(job["error"]) from None
         else:
             worker()
         return self.store.get(job["id"])
@@ -209,6 +223,10 @@ class Engine:
         return info, db, config
 
     def run(self, job, document):
+        if job.get("kind") == "reset":
+            from .reset import Reset
+
+            return Reset(self).run(job, document)
         try:
             info, db_path, config, config_hash = self.installation.resolve(job["target"])
             self.installation.maintenance_ready(info)
@@ -427,6 +445,10 @@ class Engine:
             self.lock.release()
 
     def recover_job(self, job, terminal="rolled_back"):
+        if job.get("kind") == "reset":
+            from .reset import Reset
+
+            return Reset(self).recover_job(job)
         if job["phase"] in TERMINAL:
             return
         if job["phase"] == "reserved":
@@ -518,6 +540,7 @@ class Engine:
         elif self.installation.target(job["target"]).get("state") != "stopped":
             raise Blocked("Originally stopped Frigate changed state unexpectedly")
         job["recovery_required"] = False
+        job.pop("recovery_error", None)
         job["completed_at"] = time.time()
         self.phase(job, outcome)
 
@@ -533,6 +556,10 @@ class Engine:
             if job["phase"] not in TERMINAL or not job.get("backup") or job.get("backup_removed"):
                 raise Blocked("No completed backup is available")
             self.storage.validate(job["mount"])
+            if job.get("kind") == "reset":
+                from .reset import Reset
+
+                Reset(self).remove_local_evidence(job)
             for key in ("backup", "manifest"):
                 path = self.storage.file(job[key], exists=False)
                 if path.exists():

@@ -10,24 +10,33 @@
 <main>
   <header><span class="eyebrow">HOME ASSISTANT · STORAGE</span><h1>Frigate Storage Manager</h1>
     <p>Understand your storage. Preview a cleanup without interrupting Frigate.</p></header>
-  <aside class="notice"><strong>Read-only validation release · {{ version }}</strong>
-    <p>Deletion and recovery mutations are locked until this HAOS installation is validated.
-       Previews keep Frigate running and preserve its configuration.</p></aside>
+  <aside class="notice"><strong>Experimental cleanup release · {{ version }}</strong>
+    <p>Cleanup is available to authorized users after validation and confirmation.
+       Previews keep Frigate running. Cleanup pauses only Frigate, backs up metadata,
+       and removes the selected history. Start with a small selection on one camera.</p></aside>
   <div id="error" role="alert" hidden></div>
   <section aria-labelledby="connection-title">
     <h2 id="connection-title">1. Connect to Frigate</h2>
     <div class="controls"><label>Frigate app<select id="target"><option value="">Select an installation</option></select></label>
       <button id="validate">Validate connection</button><button id="probe" class="secondary" disabled>Test write access</button></div>
     <p id="connection" role="status">Discovering installed Frigate apps…</p>
+    <p id="maintenance-status" class="hint" role="status">Validate the selected connection to check cleanup prerequisites.</p>
+    <p id="probe-status" class="hint" role="status"></p>
+    <details id="access-help"><summary>Cleanup access</summary>
+      <p>Add your HA user ID below to <code>admin_user_ids</code> in Frigate Storage Manager’s
+        Configuration tab, save, and restart this manager. This authorizes write probes,
+        cleanup and recovery. Then validate the connection again.</p><p>Your HA user ID: <code id="user"></code></p>
+      <p>Before cleanup, turn off <strong>Start on boot, Watchdog and Auto update</strong>
+        on the selected Frigate app’s Info page. Leave Frigate running; this manager
+        stops and restarts it for the job. Restore those settings after the job resolves.</p></details>
     <div class="storage" id="storage" hidden>
       <div><span>Media used</span><strong id="used">—</strong></div>
       <div><span>Media free</span><strong id="free">—</strong></div>
       <div><span>Media total</span><strong id="total">—</strong></div>
     </div>
     <details id="validation-details"><summary>Validation details</summary><pre id="diagnostics">No validation yet.</pre>
-      <p>Your HA user ID: <code id="user"></code>. An administrator can add it to this app’s
-        <code>admin_user_ids</code> option to permit disposable write probes. Probes create and remove
-        a tiny temporary file in the selected media and database directories.</p></details>
+      <p>Probes write, read, rename and remove a tiny temporary file in the selected
+        media and database directories. They do not change existing footage or database rows.</p></details>
   </section>
   <section aria-labelledby="preview-title">
     <h2 id="preview-title">2. Preview old history</h2>
@@ -81,11 +90,29 @@
       <div class="pagination"><button id="inspection-previous" class="secondary" disabled>Previous</button><button id="inspection-next" class="secondary" disabled>Next</button></div>
     </details>
     </details>
-    <button id="delete" class="danger" disabled>Delete selected history</button><span class="hint" id="delete-help"> Disabled pending live validation.</span>
+    <button id="delete" class="danger" disabled>Delete selected history</button><p class="hint" id="delete-help" role="status">Validate the connection and create a fresh preview.</p>
   </section>
   <section aria-labelledby="jobs-title"><h2 id="jobs-title">Jobs and recovery</h2><div id="jobs">No cleanup jobs.</div>
     <p class="hint">Jobs survive closing this page. An interrupted job blocks further cleanup until recovered.
       Metadata backups cannot restore deleted video. Up to five backups are retained; removal is explicit.</p></section>
+  <section aria-labelledby="reset-title">
+    <h2 id="reset-title">Clear everything</h2>
+    <p>Delete <strong>all Frigate media and its database</strong>: every camera’s recordings,
+      clips, snapshots, thumbnails, previews, face/trigger images and exports, plus <code>frigate.db</code>.</p>
+    <p>Bookmarks, history and Frigate database users are removed. Camera settings, retention,
+      credentials in the configuration file, models and Home Assistant remain intact.
+      Frigate pauses and creates a fresh database when restarted.</p>
+    <button id="reset-prepare" class="danger" disabled>Clear everything…</button>
+    <p id="reset-help" class="hint" role="status">Validate the selected connection first.</p>
+    <form id="reset-confirm" hidden>
+      <pre id="reset-target"></pre>
+      <p>This ignores the camera and date filters above and includes media written until Frigate stops.
+        Deleted video cannot be restored from the retained metadata backup.</p>
+      <label><span>Type <strong>DELETE ALL FRIGATE DATA</strong> to confirm</span><input id="reset-phrase" autocomplete="off" spellcheck="false" required></label>
+      <p><button id="reset-submit" class="danger" type="submit" disabled>Delete all media and database</button>
+        <button id="reset-cancel" class="secondary" type="button">Cancel</button></p>
+    </form>
+  </section>
   <footer>Frigate Storage Manager · Local database, existing NFS media · No video processing</footer>
 </main>
 </body>

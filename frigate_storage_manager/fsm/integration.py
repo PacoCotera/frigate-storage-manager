@@ -169,17 +169,25 @@ class Installation:
         db = safe_path(self.config_dir(slug), rel)
         return info, db, config, fingerprint
 
-    def maintenance_ready(self, info):
+    def maintenance_blockers(self, info):
         # Supervisor's sys_options endpoint is Core-only; this app cannot safely
         # disable auto-start. Fail closed rather than promise reboot safety.
-        if (
-            info.get("boot") != "manual"
-            or info.get("watchdog") is not False
-            or info.get("auto_update") is not False
+        blockers = []
+        for key, expected, label in (
+            ("boot", "manual", "Start on boot"),
+            ("watchdog", False, "Watchdog"),
+            ("auto_update", False, "Auto update"),
         ):
-            raise Blocked(
-                "Before maintenance, disable Frigate Start on boot, Watchdog and Auto update in HA"
-            )
+            if info.get(key) != expected or (expected is False and info.get(key) is not False):
+                blockers.append(f"Turn off Frigate {label} in its Home Assistant app settings.")
+        if info.get("state") not in ("started", "stopped"):
+            blockers.append("Wait for Frigate to reach a stable started or stopped state.")
         own = self.supervisor.info("self")
         if not own.get("hassio_api") or own.get("hassio_role") != "manager":
-            raise Blocked("Supervisor manager role is required")
+            blockers.append("Supervisor manager role is required.")
+        return blockers
+
+    def maintenance_ready(self, info):
+        blockers = self.maintenance_blockers(info)
+        if blockers:
+            raise Blocked(" ".join(blockers))

@@ -48,4 +48,5 @@ at `915c716135743facd557f538f2463551df212106` specifies 0.17.2 and maps both
 Extra tables, columns, foreign keys, triggers, views or vector layouts fail closed.
 Historical schema variations require review even with a matching version string.
 The only manager-owned live-DB extension is the bounded `_fsm_commit` witness table,
-used only by the disabled offline maintenance engine.
+used only by selected-history maintenance. Full reset deletes the entire database and
+uses a separate local durable commit marker while Frigate creates a fresh database.

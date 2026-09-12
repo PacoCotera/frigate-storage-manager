@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0
+
+- Enable explicitly confirmed maintenance after live discovery/preview validation
+  and operator authorization to proceed with destructive testing.
+- Add **Clear everything** with a separate target review and typed confirmation.
+  It removes all Frigate recordings, clips and exports plus its local SQLite database
+  and sidecars, including bookmarks/history/database users. Configuration stays intact.
+- Stage full-reset media directories on NFS and database files locally by rename;
+  recover before/after a durable reset commit marker. Stream large trees with bounded
+  memory and verify filesystem/path identities before removal.
+- Show actionable authorization/lifecycle prerequisites, disposable rename checks,
+  readable job phases and completion results. Disable recovery while a worker is active.
+- Test enabled cleanup/reset/recovery HTTP routes and real worker interruption;
+  actual HAOS cleanup/reset remains pending rather than claimed as validated.
+
 ## 0.1.4
 
 - Replace the default row listing with camera summaries: selected footage duration,

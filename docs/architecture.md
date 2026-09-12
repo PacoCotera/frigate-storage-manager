@@ -82,7 +82,37 @@ The NFS server must honor fsync/rename. External actors must not start Frigate o
 its DB while stopped. Observed configuration, lifecycle, mount or identity changes
 block progress. Storage rollback/external changes can require manual reconciliation.
 
-`DESTRUCTIVE_ENABLED` is false without an option/environment override. Both production
-engine and HTTP handlers enforce it. Tests inject a gate only into temporary synthetic
-fixtures, which are excluded from the image. Real access/preview evidence and an
-explicitly approved small cleanup precede any reviewed enablement release.
+`DESTRUCTIVE_ENABLED` is true in 0.2.0 after real discovery/preview access and explicit
+operator authorization to start destructive testing. The default user allowlist is
+empty. HTTP handlers and the engine still enforce authorization, confirmation and
+runtime checks. Read-only validation releases 0.1.x had this constant disabled.
+
+## Full reset protocol
+
+Full reset is a distinct operation with a distinct one-use, user-bound confirmation
+and a typed phrase. A cleanup token cannot authorize reset or vice versa. It clears
+all cameras/bookmarks in Frigate 0.17.2's three media trees (`recordings`, `clips`,
+`exports`) and the selected local database with SQLite sidecars. Configuration and
+unrelated media-share directories stay outside its scope. New media up to the stop
+is explicitly included; the date/camera form is not a reset filter.
+
+The shared job reservation and worker mutex exclude concurrent cleanup/reset/recovery.
+After probes and verified stop, it saves a coherent metadata backup on NFS and a
+small immutable manifest containing the three directory identities and at most four
+SQLite file identities. Media directories move by rename to NFS staging. Database
+files move by rename within their original local parent, so the database is never
+moved onto NFS and no extra database copy is made on the HAOS disk.
+
+Before committing, a postorder iterator validates every staged media entry without
+materializing the tree; memory and open iterators are bounded by depth (64 maximum).
+Paths, symlinks/reparse points, hardlinks, nested filesystems and nonregular entries
+are checked before any irreversible removal and again while purging. The full reset
+is not constrained by the preview item cap and can require substantial downtime.
+
+An atomic, fsynced `committed.json` marker inside local `.fsm-reset-<job>` is the
+explicit point of no return. Without it, recovery restores all staged directories and
+SQLite files. With a matching marker/manifest, it completes streaming deletion and
+removes the staged database files. Conflicting/missing evidence, changed mounts or
+unexpected reappearance of original paths leaves Frigate stopped. Restart is persisted
+separately and can be retried without touching a newly created database. Markers and
+metadata backups remain available until explicit completed-backup disposal.

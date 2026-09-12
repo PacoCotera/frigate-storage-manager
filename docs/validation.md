@@ -41,11 +41,37 @@ image and checks direct non-ingress rejection. None of these install into HAOS.
 - [x] Produce read-only previews of real old recordings for one and two cameras.
 - [ ] Inspect a known event/bookmark and its protected footage; confirm ongoing recording.
 - [ ] Record sanitized evidence in issue #1 and review any differences.
-- [ ] Review gate enablement, lifecycle test and a small explicitly approved cleanup.
+- [x] Operator authorized destructive testing and a separate complete media/database reset; 0.2.0 enables the workflows with runtime checks.
+- [ ] Complete a real lifecycle test and confirmed cleanup/reset.
 - [ ] Verify real cleanup/recovery before claiming production readiness.
 
 No live recordings have been deleted, real Frigate lifecycle changed, or live Frigate
 configuration modified by this development work.
+
+### 0.2.0: authorized maintenance and full reset
+
+After successful live discovery/storage/previews, the operator explicitly requested
+destructive testing and a button to delete all Frigate media plus `frigate.db`.
+The release gate is enabled while the ingress user allowlist, CSRF, one-use frozen
+confirmation, storage/version/configuration checks and lifecycle safeguards remain.
+An empty default allowlist permits no mutations. Validation displays actionable
+maintenance blockers, and disposable probes now test rename as well as write/read/delete.
+
+Full reset intentionally overrides bookmark/history preservation only for its distinct
+typed confirmation. Tests exercise the enabled HTTP boundary, operation/user binding,
+all-camera/media/database removal, configuration preservation, durable staging/commit
+recovery, real WAL sidecars, worker termination, changed mounts/paths, unsafe entries,
+failed startup and streaming memory bounds. CI and browser results are recorded in
+issue #1 and PR #2. These synthetic checks do not establish live deletion or recovery.
+
+The local full suite passed 209 tests with six platform/privilege skips, followed by
+one additional operation-binding pass and one Windows symlink-privilege skip. Eleven
+JavaScript tests pass. Browser QA completed selected cleanup and full reset against
+disposable synthetic data, checked typed confirmation, displayed active job progress
+with recovery disabled, and retained completion after reload without console errors.
+The unauthorised-user/automatic-start case displays each prerequisite while keeping
+previews available. CI runs the final combined suite on both platforms and builds
+the installable image; its exact results are recorded in the issue/PR.
 
 ### 2026-09-11: first live feedback and 0.1.1 fix
 

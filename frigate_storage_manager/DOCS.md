@@ -15,11 +15,13 @@ Install from the repository/feature branch in README, start the app and choose
 | `target_slug` | empty | Optional explicit Frigate identifier; otherwise select in the page. Never automatically chosen. |
 | `database_relative_path` | `frigate.db` | Relative path inside the selected configuration directory, matching Frigate's effective `/config/...` database path. |
 | `media_path` | `/media/frigate` | Existing NFS media directory beneath `/media`. Frigate's indexed `/media/frigate` paths are translated to this explicit root. |
-| `admin_user_ids` | `[]` | HA user IDs authorized for disposable probes and future maintenance. Your ID appears under Validation details. |
+| `admin_user_ids` | `[]` | HA user IDs authorized for probes, cleanup, full reset and recovery. Your ID appears under Cleanup access. |
 | `max_plan_items` | `10000` | Combined selected-row/file cap, range 100–20000. Choose an earlier cutoff/fewer cameras if exceeded. |
 
-There is **no deletion-enable option** in 0.1.4. Options and environment variables
-cannot unlock it. Enablement requires a reviewed release after live validation.
+Version **0.2.0 enables maintenance** after explicit operator authorization to proceed
+with real cleanup testing. The empty user allowlist still blocks all mutations by
+default. Add your HA user ID in Configuration, save and restart this manager.
+Preview/discovery access is established; real cleanup/recovery is not yet validated.
 
 ## Real HAOS checklist
 
@@ -36,7 +38,7 @@ configuration hash and version still match that cache.
 5. Confirm current and historical cameras. Disabled cameras present in configuration
    use their current capture settings; removed cameras use global capture padding.
 6. Optionally add your HA user ID to `admin_user_ids`, restart this manager, and use
-   **Test write access**. It creates, fsyncs, reads and removes a random 17-byte file
+   **Test write access**. It creates, fsyncs, reads, renames and removes a random 17-byte file
    in the media root and selected database parent. Existing media/rows stay untouched.
    A directory probe does not prove every descendant's rename/delete permissions.
 7. Preview clearly old history. Inspect selected/preserved items and reasons, and verify
@@ -44,8 +46,56 @@ configuration hash and version still match that cache.
 8. Record sanitized results in issue #1. Do not share full configurations, database
    backups, camera credentials, tokens or private footage.
 
-Lifecycle validation reports declared `manager` permission, **not a real stop/start
-test**. A real lifecycle and small-cleanup test require later explicit approval.
+Lifecycle validation reports declared `manager` permission, **not a completed stop/start
+test**. Actual stop/start happens during the confirmed maintenance job, with state
+verification before media/database changes. No additional release unlock is required.
+
+## Delete selected history
+
+1. Add your HA user ID to `admin_user_ids` and restart this manager if not already done.
+2. In the selected **Frigate** app's Info page, turn off **Start on boot**, **Watchdog**
+   and **Auto update**. Leave Frigate running. The manager cannot change these Core-only
+   Supervisor options; they prevent an automatic restart over an interrupted operation.
+3. Back in the manager, **Validate connection**. The page lists each remaining blocker.
+4. Create a fresh, small preview on one camera and confirm **Delete selected history**.
+5. The job checks disposable write/rename/delete access before stopping Frigate, makes
+   an NFS metadata backup, stages media, commits metadata and finishes removal. Watch
+   **Jobs and recovery**; closing/reloading the page does not cancel the worker.
+6. When the job resolves, restore Frigate's automatic settings as desired. Verify the
+   result in Frigate before continuing with larger selections.
+
+The optional probe button is useful for diagnosing permissions; the job repeats probes
+automatically. Failed access checks reject the job before stopping Frigate. A failed
+or interrupted operation stays visible and must be recovered before starting another.
+
+## Clear everything: all media and database
+
+Use **Clear everything…** when you want a complete history reset. It has its own review
+and confirmation and **ignores camera/date/export selections** in the preview form.
+The same administrator and Frigate automatic-setting requirements apply.
+
+It deletes the complete `recordings`, `clips` and `exports` directories beneath the
+validated Frigate media root, including all cameras, unindexed files within those
+directories, snapshots, previews, face/trigger images, completed/in-progress exports
+and bookmarked footage. It also deletes the selected local `frigate.db` and its
+`-wal`, `-shm` and `-journal` sidecars. Database users, history, bookmarks and semantic
+metadata are reset. Configuration files, model cache, Home Assistant and unrelated
+media-share directories are outside the reset. Manager metadata backups are retained
+for explicit disposal; they contain no copy of deleted video.
+
+Click **Clear everything…**, review the exact paths and target, type
+`DELETE ALL FRIGATE DATA`, then press **Delete all media and database**. Files written
+until Frigate stops are included. It backs up metadata, stages media on NFS and SQLite
+files locally without copying them onto the HAOS disk, validates the tree and records
+a durable reset commit marker. Then it removes the staged data. There is no full-library
+in-memory plan or per-item selection cap; scanning/deleting a large archive can take
+a long time and Frigate stays stopped until resolved.
+
+If Frigate was running, it restarts and creates a fresh database. Otherwise it remains
+stopped until you start it. Removing database users may require using Frigate's initial
+administrator setup again; Home Assistant users are unchanged. Recovery before reset
+commit restores media and SQLite files; after commit it completes deletion. Do not
+erase staging/journals or manually restart Frigate over an unresolved reset.
 
 ## Progress and saved previews
 
@@ -140,10 +190,10 @@ Unindexed orphan files, training images, faces, models and logs are outside scop
   erase persistent data during an unresolved job.
 
 To install these preview improvements, refresh the app store repository information,
-open **Frigate Storage Manager**, and update to **0.1.4**. Reopen its Web UI and
+open **Frigate Storage Manager**, and update to **0.2.0**. Reopen its Web UI and
 confirm the version in the notice. Frigate itself does not need an update or restart.
 
-For a later maintenance release, disable Frigate's **Start on boot, Watchdog and Auto
+For maintenance, disable Frigate's **Start on boot, Watchdog and Auto
 update** first. Restore them in HA only after the job resolves. This manager cannot
 change Supervisor's Core-only system options. Preview does not require these changes.
 
