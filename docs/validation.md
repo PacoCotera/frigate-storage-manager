@@ -4,8 +4,9 @@ Implementation follows [issue #1](https://github.com/PacoCotera/frigate-storage-
 
 ## Automated evidence
 
-The Windows development run passed **107 tests**, with five Linux/symlink-specific
-checks deferred to Linux CI. Final counts and CI links are recorded in issue #1/PR.
+The original Windows development run passed **107 tests**; subsequent versions add
+regressions. Platform/privilege checks also run in Linux CI. Current counts and CI
+links are recorded in issue #1/PR and the version notes below.
 They are not evidence of actual HAOS installation/access.
 
 Coverage includes camera/time boundaries, historical cameras, bookmarks and transitive
@@ -33,11 +34,12 @@ image and checks direct non-ingress rejection. None of these install into HAOS.
 
 - [x] Install, start and display the ingress UI on the existing HAOS VM (user screenshot).
 - [ ] Verify ingress identity and write authorization.
-- [ ] Discover/select the actual Frigate identifier/version/state.
-- [ ] Verify the supported local database mapping and real schema.
-- [ ] Confirm the remote NFS source, availability and media filesystem capacity.
+- [x] Discover/select the actual Frigate identifier/version/state (0.1.2 UI evidence).
+- [x] Read the supported local database and real schema (successful 0.1.2 previews).
+- [x] Pass NFS validation and display capacity on the existing share (0.1.2 UI evidence).
 - [ ] Validate disposable write access and restricted backup-directory permissions.
-- [ ] Preview real old history and inspect counts/protection without interruption.
+- [x] Produce read-only previews of real old recordings for one and two cameras.
+- [ ] Inspect a known event/bookmark and its protected footage; confirm ongoing recording.
 - [ ] Record sanitized evidence in issue #1 and review any differences.
 - [ ] Review gate enablement, lifecycle test and a small explicitly approved cleanup.
 - [ ] Verify real cleanup/recovery before claiming production readiness.
@@ -82,3 +84,34 @@ Days input, switched to Hours, and completed a 12-hour preview. Changing to 1 ho
 hid the previous result. Switching to a specific date also completed a preview
 despite the inactive invalid Days input. Bookmarks and the deletion lock remained
 visible in both previews. No additional live HAOS access is inferred from this test.
+
+### 0.1.2 live feedback and 0.1.3 preview improvements
+
+User screenshots subsequently show successful discovery, local schema access, NFS
+validation and one-/two-camera previews. A single-camera preview reportedly took
+5–10 seconds. The earlier missing result/duplicate warning remains an unclassified
+failure; the old UI did not retain enough evidence to diagnose it. Those successful
+live selections contained recordings/previews, with no selected events/reviews or
+bookmarks. They do not validate bookmark protection, write access or maintenance.
+
+0.1.3 adds durable background previews, phase/elapsed/record progress, reconnection,
+duplicate attachment, saved result retrieval and a metadata item inspector with
+decision reasons. All selected records are inspectable; preserved examples are
+explicitly capped at 500 per category. Details come from the selection snapshot.
+
+New automated cases cover duplicate requests, response loss/reopening, user isolation,
+failed thread start, visible error payloads, restart interruption and completed-result
+persistence, expiry/retention, pagination, stable snapshots, bookmark/link/padding/
+trigger explanations, semantic references and compatibility with offline cleanup.
+The 100,000-record archive test now also includes inspection and keeps peak traced
+Python allocations below 12 MiB. That bound excludes SQLite/native allocations and
+does not estimate total HAOS memory or large-NFS latency.
+
+Browser QA against disposable synthetic media observed immediate progress and disabled
+controls, reloaded during a delayed preview and recovered its completed result,
+followed a protected recording to its bookmark, and reopened a saved result after
+editing the form. A simulated background failure remained visible after reopening,
+with controls released and no JavaScript warnings/errors. The local Windows suite
+passes 144 Python tests (six platform/privilege skips), plus four JavaScript tests;
+lint, formatting and syntax checks pass. CI reruns all platform/image checks.
+Live testing of 0.1.3 and the remaining maintenance gates still require the user.

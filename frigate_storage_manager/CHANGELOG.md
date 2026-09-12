@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.3
+
+- Run previews in one background worker with durable phase, elapsed time and
+  record progress. Disable repeated submission and reattach to the existing task.
+- Retrieve active/completed previews after reopening ingress. Retain four recent
+  task receipts and four bounded result snapshots; item details expire after 15 minutes.
+- Inspect all selected records and a clearly labelled preserved sample, including
+  IDs, cameras, times, decision reasons, related records and selected media paths/sizes.
+- Report failed/interrupted previews visibly and log phases, duration and error type
+  without camera identifiers, paths or exception payloads.
+- Cover duplicate/lost responses, restart persistence, expiry, user isolation,
+  bookmark/overlap explanations and bounded inspection of a large synthetic archive.
+- Keep deletion and recovery mutations locked.
+
 ## 0.1.2
 
 - Add an Older than hours cutoff with one-hour precision and a 12-hour default.

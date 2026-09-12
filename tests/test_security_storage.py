@@ -37,7 +37,10 @@ def test_ingress_validation_preview_and_disabled_delete(env):
         json={"target": SLUG, "cameras": ["front"], "cutoff": CUTOFF},
         headers=headers,
     )
-    assert response.status_code == 200, response.json
+    assert response.status_code == 202, response.json
+    c.application.extensions["previews"].thread.join(10)
+    response = c.get(f"/api/previews/{response.json['id']}")
+    assert response.json["state"] == "completed", response.json
     assert response.json["result"]["counts"]["recordings"] == 1
     assert "rows" not in response.json["result"]
     assert c.post("/api/delete", json=response.json, headers=headers).status_code == 409

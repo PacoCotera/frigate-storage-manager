@@ -44,12 +44,36 @@
       <button id="preview" type="submit" disabled>Preview cleanup</button>
     </form>
   </section>
+  <section id="preview-status-section" hidden aria-labelledby="preview-status-title">
+    <h2 id="preview-status-title">Preview status</h2>
+    <div class="controls"><label>Recent previews<select id="preview-history"></select></label>
+      <button id="preview-show" class="secondary">Show saved preview</button></div>
+    <p id="preview-status" role="status" aria-live="polite"></p>
+    <progress id="preview-progress" aria-label="Preview progress"></progress>
+    <p id="preview-scope" class="hint"></p>
+    <p id="preview-connection" class="hint"></p>
+  </section>
   <section id="result-section" hidden aria-labelledby="result-title">
     <h2 id="result-title">3. Review the selection</h2>
     <p id="scope"></p><div class="estimate"><strong id="recoverable"></strong><span>estimated media bytes recoverable</span></div>
     <div class="columns"><div><h3>Selected for cleanup</h3><dl id="counts"></dl></div><div><h3>Preserved</h3><dl id="preserved"></dl></div></div>
     <p class="hint">Only completed items ending strictly before the cutoff are eligible. Segments touching or crossing it are kept.
       Storage-side snapshots or retention can delay any increase in free space.</p>
+    <details id="inspection" open>
+      <summary>Inspect selected and preserved items</summary>
+      <p class="hint">These records come from this preview's database snapshot. No video is loaded.
+        Selected records are listed in full. Preserved history is sampled: up to 500 items per category,
+        with bookmarked events first, then unfinished and oldest history. Search covers retained items only.</p>
+      <form id="inspection-form" class="controls">
+        <label>Show<select id="inspection-view"><option value="selected">Selected for cleanup</option><option value="preserved">Preserved</option></select></label>
+        <label>Category<select id="inspection-kind"><option value="">All categories</option></select></label>
+        <label>Find ID, camera or reason<input id="inspection-search" type="search" maxlength="128"></label>
+        <button type="submit" class="secondary">Find items</button>
+      </form>
+      <p id="inspection-count" class="hint" role="status"></p>
+      <div class="table-scroll"><table><thead><tr><th>Item / camera</th><th>Time</th><th>Decision and related media</th></tr></thead><tbody id="inspection-items"></tbody></table></div>
+      <div class="pagination"><button id="inspection-previous" class="secondary" disabled>Previous</button><button id="inspection-next" class="secondary" disabled>Next</button></div>
+    </details>
     <button id="delete" class="danger" disabled>Delete selected history</button><span class="hint" id="delete-help"> Disabled pending live validation.</span>
   </section>
   <section aria-labelledby="jobs-title"><h2 id="jobs-title">Jobs and recovery</h2><div id="jobs">No cleanup jobs.</div>

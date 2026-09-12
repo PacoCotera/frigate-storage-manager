@@ -13,8 +13,9 @@ from werkzeug.exceptions import HTTPException
 from . import DESTRUCTIVE_ENABLED, VERSION
 from .database import connect, validate_schema
 from .jobs import TERMINAL
-from .planner import build_plan, camera_names, summary
-from .safety import Blocked, digest, file_identity, identifier
+from .planner import camera_names
+from .previews import PreviewService
+from .safety import Blocked, identifier
 from .storage import StorageBlocked, probe_directory
 
 
@@ -25,7 +26,8 @@ def create_app(installation, storage, store, engine):
     app = Flask(__name__)
     app.config.update(MAX_CONTENT_LENGTH=16384)
     secret = secrets.token_bytes(32)  # A restart deliberately expires browser CSRF tokens.
-    preview_lock = threading.Lock()
+    previews = PreviewService(installation, storage, store)
+    app.extensions["previews"] = previews
 
     def csrf(user, issued=None):
         issued = issued or str(int(time.time()))
@@ -128,6 +130,8 @@ def create_app(installation, storage, store, engine):
             is_admin=g.user in installation.options.get("admin_user_ids", []),
             jobs=public,
             recovery_required=any(j["phase"] not in TERMINAL for j in jobs),
+            previews=previews.recent(g.user),
+            preview_busy=previews.busy(),
         )
 
     @app.get("/api/discovery")
@@ -188,41 +192,28 @@ def create_app(installation, storage, store, engine):
 
     @app.post("/api/preview")
     def preview():
-        idle()
-        if not preview_lock.acquire(blocking=False):
-            raise Blocked("A preview is already being calculated")
+        return jsonify(previews.submit(request.json, g.user)), 202
+
+    @app.get("/api/previews/<token>")
+    def preview_status(token):
+        return jsonify(previews.get(token, g.user))
+
+    @app.get("/api/previews/<token>/items")
+    def preview_items(token):
         try:
-            body = request.json
-            slug = identifier(body.get("target"))
-            info, db, config, fingerprint = installation.resolve(slug)
-            identity = file_identity(db)
-            plan = build_plan(
-                db,
-                info["version"],
-                storage,
-                config,
-                body.get("cameras"),
-                body.get("cutoff"),
-                body.get("include_exports", False),
-                installation.options.get("max_plan_items", 10000),
+            page = int(request.args.get("page", "0"))
+        except ValueError:
+            raise Blocked("Invalid inspection page") from None
+        return jsonify(
+            previews.items(
+                token,
+                g.user,
+                request.args.get("view", "selected"),
+                request.args.get("kind", ""),
+                request.args.get("search", ""),
+                page,
             )
-            document = {
-                "target": slug,
-                "version": info["version"],
-                "config_hash": fingerprint,
-                "database": {"dev": identity["dev"], "ino": identity["ino"]},
-                "plan": plan,
-            }
-            token = store.preview(g.user, document)
-            return jsonify(
-                preview_id=token,
-                confirmation=digest(document),
-                target=slug,
-                result=summary(plan),
-                expires_seconds=900,
-            )
-        finally:
-            preview_lock.release()
+        )
 
     @app.post("/api/delete")
     def delete():

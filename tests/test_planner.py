@@ -197,7 +197,8 @@ def test_invalid_review_relationships_block(env):
         plan(env)
 
 
-def test_large_archive_bounded_memory_and_plan_cap(env):
+@pytest.mark.parametrize("inspect", [False, True])
+def test_large_archive_bounded_memory_and_plan_cap(env, inspect):
     recording(env)
     with sqlite3.connect(env.db) as db:
         db.executemany(
@@ -210,11 +211,16 @@ def test_large_archive_bounded_memory_and_plan_cap(env):
         )
     tracemalloc.start()
     start = time.monotonic()
-    result = plan(env)
+    result = plan(env, cameras=["front", "side"], inspect=inspect)
     peak = tracemalloc.get_traced_memory()[1]
     tracemalloc.stop()
     assert selected(result, "recordings") == {"r-old"}
     assert peak < 12 * 1024 * 1024
     assert time.monotonic() - start < 20
+    if inspect:
+        assert result["inspection"]["preserved_samples"]["recordings"] == {
+            "shown": 500,
+            "total": 100000,
+        }
     with pytest.raises(Blocked, match="limit"):
         plan(env, max_items=1)

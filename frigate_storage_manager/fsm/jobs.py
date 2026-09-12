@@ -73,6 +73,15 @@ class JobStore:
             db.execute("BEGIN IMMEDIATE")
             if any(j["phase"] not in TERMINAL for j in self.jobs(db)):
                 raise Blocked("Another job is active or requires recovery")
+            if (
+                db.execute(
+                    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='preview_tasks'"
+                ).fetchone()
+                and db.execute(
+                    "SELECT 1 FROM preview_tasks WHERE state IN ('queued','running')"
+                ).fetchone()
+            ):
+                raise Blocked("Wait for the read-only preview to finish before cleanup")
             backups = [j for j in self.jobs(db) if j.get("backup") and not j.get("backup_removed")]
             if len(backups) >= 5:
                 raise Blocked(

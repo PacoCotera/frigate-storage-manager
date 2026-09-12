@@ -1,3 +1,4 @@
+import logging
 import os
 from pathlib import Path
 
@@ -15,6 +16,7 @@ def main():
     import fcntl  # HAOS is Linux. Also excludes accidental standalone Windows use.
 
     os.umask(0o077)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     data = Path("/data")
     # Process-wide advisory lock is released by the kernel after a crash. Never
     # delete its inode; a second process must not recover the same job concurrently.

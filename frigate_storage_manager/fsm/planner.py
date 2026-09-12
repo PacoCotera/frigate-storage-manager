@@ -45,8 +45,19 @@ def camera_names(db, config):
 
 
 def build_plan(
-    db_path, version, storage, config, cameras, cutoff, include_exports=False, max_items=10000
+    db_path,
+    version,
+    storage,
+    config,
+    cameras,
+    cutoff,
+    include_exports=False,
+    max_items=10000,
+    *,
+    inspect=False,
+    progress=None,
 ):
+    progress = progress or (lambda *args, **kwargs: None)
     if (
         type(include_exports) is not bool
         or not isinstance(cameras, list)
@@ -56,6 +67,7 @@ def build_plan(
     if len(set(cameras)) != len(cameras):
         raise Blocked("Duplicate camera selection")
     cutoff_ts = cutoff_utc(cutoff)
+    progress("checking_storage")
     evidence = storage.validate()
     plan = {
         "scope": {
@@ -90,6 +102,7 @@ def build_plan(
 
     db = connect(db_path)
     try:
+        progress("reading_database")
         plan["vectors"] = validate_schema(db, version)
         db.execute("BEGIN")  # One consistent WAL-aware live read snapshot.
         names = camera_names(db, config)
@@ -121,6 +134,7 @@ def build_plan(
         if db.execute("""SELECT 1 FROM event JOIN selected_camera USING(camera)
             WHERE length(thumbnail)>1048576 OR length(data)>1048576 LIMIT 1""").fetchone():
             raise Blocked("An event exceeds the supported metadata size")
+        progress("protecting_history")
         db.execute("CREATE TEMP TABLE links (review TEXT, event TEXT, PRIMARY KEY(review,event))")
         db.execute("""INSERT OR IGNORE INTO links SELECT reviewsegment.id,j.value FROM reviewsegment,
             json_each(reviewsegment.data,'$.detections') j WHERE j.type='text' """)
@@ -158,6 +172,7 @@ def build_plan(
                 (SELECT l.event FROM links l WHERE l.review NOT IN (SELECT id FROM pick_reviewsegment))""").rowcount
             if not a + b:
                 break
+        progress("selecting_media")
         protected = """NOT EXISTS (SELECT 1 FROM event e WHERE e.camera=t.camera
                 AND e.id NOT IN (SELECT id FROM pick_event)
                 AND e.start_time-c.pre <= t.end_time
@@ -197,6 +212,9 @@ def build_plan(
             WHERE review_segment_id IN (SELECT id FROM pick_reviewsegment) LIMIT ?""",
             (max_items + 1,),
         )
+        total = sum(db.execute(f"SELECT count(*) FROM pick_{t}").fetchone()[0] for t in TABLES)
+        processed = 0
+        progress("checking_files", processed=processed, total=total)
         files = {}
 
         def add_file(rel, kind, required=True):
@@ -215,6 +233,7 @@ def build_plan(
             for row in db.execute(
                 f'SELECT {key} AS _key,* FROM "{table}" WHERE {key} IN (SELECT id FROM pick_{table}) ORDER BY {key}'
             ):
+                progress("checking_files", processed=processed, total=total, category=table)
                 bounded()
                 rows.append({"id": row["_key"], "signature": row_signature(row)})
                 if table == "event":
@@ -241,8 +260,10 @@ def build_plan(
                         storage.media_relative(row["thumb_path"], "export_thumbnails"),
                         "export_thumbnails",
                     )
+                processed += 1
             plan["rows"][table] = rows
             plan["counts"][table] = len(rows)
+        progress("checking_references")
         for table in plan["vectors"]:
             rows = []
             # vec0 0.1.3 supports id IN (values), not every subquery plan.
@@ -253,6 +274,9 @@ def build_plan(
                 if row:
                     bounded()
                     rows.append({"id": row["id"], "signature": row_signature(row)})
+            # Inspection uses the same selected IDs without loading vector payloads.
+            db.execute(f"CREATE TEMP TABLE pick_{table} (id PRIMARY KEY)")
+            db.executemany(f"INSERT INTO pick_{table} VALUES (?)", ((r["id"],) for r in rows))
             plan["rows"][table] = rows
             plan["counts"][table] = len(rows)
         plan["files"] = [files[p] for p in sorted(files)]
@@ -288,6 +312,11 @@ def build_plan(
                     raise Blocked("Selected media is also referenced by protected history")
         if not math.isfinite(plan["bytes"]):
             raise Blocked("Invalid media byte count")
+        if inspect:
+            from .inspection import inspect_plan
+
+            plan["inspection"] = inspect_plan(db, plan, TABLES, progress)
+        progress("verifying_storage")
         storage.validate(plan["mount"])
         return plan
     except sqlite3.Error:

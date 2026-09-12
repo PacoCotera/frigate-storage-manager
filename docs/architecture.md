@@ -10,6 +10,14 @@ kernel/Supervisor NFS agreement. `planner` builds a read-only snapshot. `Engine`
 `JobStore` coordinate recovery; `web` enforces ingress, per-user CSRF, allowlists and
 the release gate.
 
+`PreviewService` runs one read-only daemon worker and stores owner-bound task receipts
+in local SQLite. POST returns a task ID immediately; status polling never touches
+NFS. A restart interrupts unfinished previews without resuming a scan. Completed
+plans retain metadata-only inspection from the same SQLite read snapshot, alongside
+the existing confirmation digest. The offline engine compares row/file identities,
+not presentation details. Preview submission and cleanup reservation serialize their
+active-state checks in the same state database.
+
 ## Selection and resource bounds
 
 Candidate events/reviews are pruned to a fixed point across their links. A kept member
@@ -25,6 +33,11 @@ paths outside expected categories block the operation.
 - One preview at a time; 10,000 selected rows/files combined by default, maximum 20,000.
   Limit failure gives no partial approval.
 - Four previews at most, each at most 16 MiB, with 15-minute validity.
+- Four small task receipts; progress writes at most twice per second plus phase changes.
+- Inspection includes every selected record and at most 500 preserved records per
+  primary-history category. Each response has at most 50 rows. Decoding saved plans
+  is serialized across HTTP threads. No thumbnail, vector payload or event JSON is
+  copied into inspection, and preserved samples cause no extra NFS file reads.
 - SQLite 4 MiB page cache, file-backed temporary relationships, 120-second SQL budget,
   and at most 256 distinct cameras. Large archives are not materialized in Python.
 - `/data` holds settings, bounded previews and small jobs. Media/backups stay on NFS.

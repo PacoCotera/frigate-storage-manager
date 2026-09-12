@@ -18,7 +18,7 @@ Install from the repository/feature branch in README, start the app and choose
 | `admin_user_ids` | `[]` | HA user IDs authorized for disposable probes and future maintenance. Your ID appears under Validation details. |
 | `max_plan_items` | `10000` | Combined selected-row/file cap, range 100–20000. Choose an earlier cutoff/fewer cameras if exceeded. |
 
-There is **no deletion-enable option** in 0.1.2. Options and environment variables
+There is **no deletion-enable option** in 0.1.3. Options and environment variables
 cannot unlock it. Enablement requires a reviewed release after live validation.
 
 ## Real HAOS checklist
@@ -39,13 +39,50 @@ configuration hash and version still match that cache.
    **Test write access**. It creates, fsyncs, reads and removes a random 17-byte file
    in the media root and selected database parent. Existing media/rows stay untouched.
    A directory probe does not prove every descendant's rename/delete permissions.
-7. Preview clearly old history. Inspect selection/protection counts and verify
+7. Preview clearly old history. Inspect selected/preserved items and reasons, and verify
    recording/detection continued and configuration remained unchanged.
 8. Record sanitized results in issue #1. Do not share full configurations, database
    backups, camera credentials, tokens or private footage.
 
 Lifecycle validation reports declared `manager` permission, **not a real stop/start
 test**. A real lifecycle and small-cleanup test require later explicit approval.
+
+## Progress and saved previews
+
+Click **Preview cleanup** once. **Preview status** appears immediately with the
+current phase and elapsed time; the controls stay disabled while it runs. The media
+checking phase also reports processed/total selected records. Other phases use an
+indeterminate indicator because their total work is not known in advance.
+
+You can close or reload the ingress page and return to the same task. A duplicate
+request from your HA user attaches to the running preview with its original scope.
+Other users cannot retrieve its result. The manager performs one preview at a time.
+
+After completion, **Review the selection** shows counts and estimated bytes.
+**Inspect selected and preserved items** adds searchable IDs, camera names, times
+and reasons. A protected recording can identify a related event/review; **Find
+related** looks for that record in the same saved snapshot. Selected records expose
+their associated media paths and sizes. No footage or image contents are loaded.
+
+All selected records are retained within the existing plan limit. Preserved history
+is a **sample of up to 500 records per category**, prioritizing bookmarked events,
+then unfinished and oldest history. The page states sample/total counts; searching
+and related lookups cover only retained records. A record absent from the preserved
+sample is not evidence that it would be deleted. Compare a known Frigate event ID
+with the selected and preserved lists when validating protection behavior.
+
+**Recent previews → Show saved preview** reopens an earlier result, including after
+editing the form. At most four task receipts and four result snapshots are retained
+across all users. Item details remain available for 15 minutes after completion,
+unless replaced sooner; an expired summary is labelled and cannot authorize cleanup.
+Saved results describe the original snapshot, so validate and create a fresh preview
+for a new selection. Previews do not create entries under **Jobs and recovery**.
+
+Errors appear in the saved task. An app restart during a preview marks it
+**interrupted**; create a new preview after resolving any storage issue. Completed
+results survive restart within their retention limits. Phase, duration and error
+type are also written to this app's logs. Hard NFS outages can still block file IO;
+the elapsed indicator is not an IO cancellation or completion guarantee.
 
 ## Dates and scope
 
@@ -86,6 +123,10 @@ Unindexed orphan files, training images, faces, models and logs are outside scop
 - **Upgrade:** resolve active jobs first and retain manager `/data` plus matching
   media manifests/backups. Revalidate after Frigate/HAOS updates. Never downgrade or
   erase persistent data during an unresolved job.
+
+To install these preview improvements, refresh the app store repository information,
+open **Frigate Storage Manager**, and update to **0.1.3**. Reopen its Web UI and
+confirm the version in the notice. Frigate itself does not need an update or restart.
 
 For a later maintenance release, disable Frigate's **Start on boot, Watchdog and Auto
 update** first. Restore them in HA only after the job resolves. This manager cannot
