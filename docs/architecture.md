@@ -33,11 +33,17 @@ paths outside expected categories block the operation.
 - One preview at a time; 10,000 selected rows/files combined by default, maximum 20,000.
   Limit failure gives no partial approval.
 - Four previews at most, each at most 16 MiB, with 15-minute validity.
-- Four small task receipts; progress writes at most twice per second plus phase changes.
-- Inspection includes every selected record and at most 500 preserved records per
+- Four small task receipts; progress writes at most once per two seconds plus phase changes.
+- Inspection includes every selected record and at most 25 preserved records per
   primary-history category. Each response has at most 50 rows. Decoding saved plans
   is serialized across HTTP threads. No thumbnail, vector payload or event JSON is
   copied into inspection, and preserved samples cause no extra NFS file reads.
+- Camera overview counts cover all preserved history, independently of the detail
+  sample. Selected footage duration unions intervals per camera; time-window details
+  group by start hour and are fetched only on expansion, 12 groups per page. Raw
+  metadata is also loaded only on explicit expansion. No main-database writes occur.
+- Protected path references are checked in five batched queries against a capped
+  temporary selected-path table; existing path indexes remain usable.
 - SQLite 4 MiB page cache, file-backed temporary relationships, 120-second SQL budget,
   and at most 256 distinct cameras. Large archives are not materialized in Python.
 - `/data` holds settings, bounded previews and small jobs. Media/backups stay on NFS.

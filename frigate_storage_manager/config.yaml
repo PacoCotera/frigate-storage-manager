@@ -1,5 +1,5 @@
 name: Frigate Storage Manager
-version: "0.1.3"
+version: "0.1.4"
 slug: frigate_storage_manager
 description: Validate Frigate storage and preview coherent history cleanup
 url: https://github.com/PacoCotera/frigate-storage-manager

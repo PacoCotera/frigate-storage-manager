@@ -25,7 +25,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/test_time.mjs
+      - run: node --test tests/test_time.mjs tests/test_overview.mjs
       - run: python -m pytest -q --junitxml=test-results.xml
       - uses: actions/upload-artifact@v4
         if: always()

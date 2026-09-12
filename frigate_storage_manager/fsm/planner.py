@@ -97,7 +97,9 @@ def build_plan(
         count += 1
         if count > max_items:
             raise Blocked(
-                f"Selection exceeds the {max_items} item safety limit; choose an earlier cutoff or fewer cameras"
+                f"Selection exceeds the {max_items} combined database-record/media-file limit. "
+                "Choose fewer cameras or increase Hours/Days to select less history. "
+                "A recording and its file count separately."
             )
 
     db = connect(db_path)
@@ -213,6 +215,9 @@ def build_plan(
             (max_items + 1,),
         )
         total = sum(db.execute(f"SELECT count(*) FROM pick_{t}").fetchone()[0] for t in TABLES)
+        if total > max_items:
+            count = max_items
+            bounded()  # Reject known oversized selections before any per-file NFS calls.
         processed = 0
         progress("checking_files", processed=processed, total=total)
         files = {}
@@ -293,23 +298,25 @@ def build_plan(
             JOIN selected_camera USING(camera) WHERE end_time IS NULL""").fetchone()[0]
         plan["preserved"]["active_reviews"] = db.execute("""SELECT count(*) FROM reviewsegment
             JOIN selected_camera USING(camera) WHERE end_time IS NULL""").fetchone()[0]
-        # A path used by kept metadata must never be staged, even with malformed
-        # cross-category references. Queries use indexes where available.
-        for file in plan["files"]:
-            absolute = "/media/frigate/" + file["path"]
-            for table, column in (
-                ("recordings", "path"),
-                ("previews", "path"),
-                ("reviewsegment", "thumb_path"),
-                ("export", "video_path"),
-                ("export", "thumb_path"),
-            ):
-                if db.execute(
-                    f'''SELECT 1 FROM "{table}" WHERE "{column}"=? AND id NOT IN
-                    (SELECT id FROM pick_{table}) LIMIT 1''',
-                    (absolute,),
-                ).fetchone():
-                    raise Blocked("Selected media is also referenced by protected history")
+        # Check all candidate paths together. Indexed paths use index lookups;
+        # unindexed tables are scanned once, rather than once for every file.
+        db.execute("CREATE TEMP TABLE selected_path (path TEXT PRIMARY KEY)")
+        db.executemany(
+            "INSERT INTO selected_path VALUES (?)",
+            (("/media/frigate/" + f["path"],) for f in plan["files"]),
+        )
+        for table, column in (
+            ("recordings", "path"),
+            ("previews", "path"),
+            ("reviewsegment", "thumb_path"),
+            ("export", "video_path"),
+            ("export", "thumb_path"),
+        ):
+            if db.execute(
+                f'''SELECT 1 FROM "{table}" WHERE "{column}" IN (SELECT path FROM selected_path)
+                AND id NOT IN (SELECT id FROM pick_{table}) LIMIT 1'''
+            ).fetchone():
+                raise Blocked("Selected media is also referenced by protected history")
         if not math.isfinite(plan["bytes"]):
             raise Blocked("Invalid media byte count")
         if inspect:

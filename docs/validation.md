@@ -115,3 +115,30 @@ with controls released and no JavaScript warnings/errors. The local Windows suit
 passes 144 Python tests (six platform/privilege skips), plus four JavaScript tests;
 lint, formatting and syntax checks pass. CI reruns all platform/image checks.
 Live testing of 0.1.3 and the remaining maintenance gates still require the user.
+
+### 0.1.4: understandable results and latency investigation
+
+Live feedback from 0.1.3 confirms a completed result and durable selection-limit
+failure, but the default individual-row listing was too technical and a subsequent
+preview was much slower. The UI now presents camera footage duration, recorded time
+ranges, estimated space and plain-language keep/remove decisions. Raw counts/IDs
+are closed by default; full preserved totals remain separate from 25-example samples.
+
+Tests cover overlapping/nested/gapped and cross-hour footage, multiple cameras,
+size reconciliation, exact kept totals beyond the sample, owner-bound/expiring time
+pages, known oversized selections before NFS file calls and cross-camera protected
+file references. Browser QA uses thousands of synthetic recordings via
+`tools/ui_fixture.py --many-recordings` to avoid validating only a tiny row listing.
+
+`tools/benchmark_preview.py` generates 2,001 selected and 25,000 preserved synthetic
+recordings plus 80 kept events. Locally, the old/new workers both finish in roughly
+1–2 seconds; this does not reproduce or explain the live slowdown. The release
+reduces diagnostic sampling and journal writes, batches reference queries, and saves
+phase timings for the next live diagnosis. No claim of restored real-NFS latency is
+made. Full CI evidence and remaining live gates are tracked in issue #1/PR #2.
+
+Local validation passes 154 Python tests with six platform/privilege skips and seven
+JavaScript tests. Lint, formatting and syntax pass. Browser QA of version 0.1.4
+verified an initial summary with zero individual rows loaded, grouped ranges,
+working diagnostics on explicit expansion, and visible phase timings without
+JavaScript warnings/errors. Synthetic footage remained behind the disabled gate.

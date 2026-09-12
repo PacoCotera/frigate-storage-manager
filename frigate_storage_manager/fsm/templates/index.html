@@ -41,28 +41,34 @@
       <p class="hint" id="boundary"></p>
       <label class="check"><input id="exports" type="checkbox"> Include completed exports, using their creation time</label>
       <p class="hint">Bookmarks, linked history, unfinished items, required footage and in-progress exports are preserved.</p>
+      <p class="hint">More hours or days selects less history. Large selections may need fewer cameras;
+        the safety limit counts database records and media files separately.</p>
       <button id="preview" type="submit" disabled>Preview cleanup</button>
     </form>
   </section>
   <section id="preview-status-section" hidden aria-labelledby="preview-status-title">
     <h2 id="preview-status-title">Preview status</h2>
-    <div class="controls"><label>Recent previews<select id="preview-history"></select></label>
-      <button id="preview-show" class="secondary">Show saved preview</button></div>
     <p id="preview-status" role="status" aria-live="polite"></p>
     <progress id="preview-progress" aria-label="Preview progress"></progress>
-    <p id="preview-scope" class="hint"></p>
     <p id="preview-connection" class="hint"></p>
+    <details><summary>Previous previews and technical information</summary>
+      <div class="controls"><label>Recent previews<select id="preview-history"></select></label>
+        <button id="preview-show" class="secondary">Show saved preview</button></div>
+      <p id="preview-scope" class="hint"></p><pre id="preview-timings"></pre></details>
   </section>
   <section id="result-section" hidden aria-labelledby="result-title">
     <h2 id="result-title">3. Review the selection</h2>
-    <p id="scope"></p><div class="estimate"><strong id="recoverable"></strong><span>estimated media bytes recoverable</span></div>
-    <div class="columns"><div><h3>Selected for cleanup</h3><dl id="counts"></dl></div><div><h3>Preserved</h3><dl id="preserved"></dl></div></div>
-    <p class="hint">Only completed items ending strictly before the cutoff are eligible. Segments touching or crossing it are kept.
-      Storage-side snapshots or retention can delay any increase in free space.</p>
-    <details id="inspection" open>
-      <summary>Inspect selected and preserved items</summary>
+    <p id="scope"></p><div class="estimate"><strong id="recoverable"></strong><span>estimated space this cleanup could recover</span></div>
+    <p id="recording-duration" class="footage-total"></p>
+    <p id="decision-summary"></p><p id="bookmark-summary" class="hint"></p>
+    <div id="camera-overview"></div>
+    <p class="hint">Only completed footage ending before the cutoff is eligible. Storage snapshots can delay an increase in free space.</p>
+    <details id="technical-details"><summary>Technical details: counts and individual records</summary>
+      <div class="columns"><div><h3>Selected for cleanup</h3><dl id="counts"></dl></div><div><h3>Preserved</h3><dl id="preserved"></dl></div></div>
+    <details id="inspection">
+      <summary>Browse individual records</summary>
       <p class="hint">These records come from this preview's database snapshot. No video is loaded.
-        Selected records are listed in full. Preserved history is sampled: up to 500 items per category,
+        Selected records are listed in full. Preserved history is sampled: up to <span id="inspection-sample-limit">25</span> items per category,
         with bookmarked events first, then unfinished and oldest history. Search covers retained items only.</p>
       <form id="inspection-form" class="controls">
         <label>Show<select id="inspection-view"><option value="selected">Selected for cleanup</option><option value="preserved">Preserved</option></select></label>
@@ -73,6 +79,7 @@
       <p id="inspection-count" class="hint" role="status"></p>
       <div class="table-scroll"><table><thead><tr><th>Item / camera</th><th>Time</th><th>Decision and related media</th></tr></thead><tbody id="inspection-items"></tbody></table></div>
       <div class="pagination"><button id="inspection-previous" class="secondary" disabled>Previous</button><button id="inspection-next" class="secondary" disabled>Next</button></div>
+    </details>
     </details>
     <button id="delete" class="danger" disabled>Delete selected history</button><span class="hint" id="delete-help"> Disabled pending live validation.</span>
   </section>

@@ -160,13 +160,20 @@ class PreviewService:
 
     def _run(self, token, user, request):
         started = time.monotonic()
-        document = {"request": request}
-        last = {"phase": None, "saved": 0}
+        document = {"request": request, "timings": {}}
+        last = {"phase": None, "saved": 0, "started": started}
+
+        def finish_phase():
+            if last["phase"]:
+                document["timings"][last["phase"]] = round(time.monotonic() - last["started"], 3)
 
         def progress(phase, **values):
             changed = phase != last["phase"]
-            if not changed and time.monotonic() - last["saved"] < 0.5:
+            if not changed and time.monotonic() - last["saved"] < 2:
                 return
+            if changed:
+                finish_phase()
+                last["started"] = time.monotonic()
             document.update(
                 phase=phase,
                 processed=values.get("processed"),
@@ -205,9 +212,10 @@ class PreviewService:
                 "plan": plan,
             }
             preview_id = self.store.preview(user, frozen)
+            finish_phase()
             document.update(
                 phase="completed",
-                result=summary(plan),
+                result=summary(plan) | {"overview": plan["inspection"]["overview"]},
                 preview_id=preview_id,
                 confirmation=digest(frozen),
                 expires_at=time.time() + 900,
@@ -217,6 +225,7 @@ class PreviewService:
             self._save(token, "completed", document)
             LOG.info("Preview %s completed elapsed=%.1fs", token, time.monotonic() - started)
         except Exception as exc:
+            finish_phase()
             document.update(
                 phase="failed",
                 failed_phase=last["phase"],
@@ -246,17 +255,7 @@ class PreviewService:
     def _items(self, token, user, view, kind, search, page):
         if view not in ("selected", "preserved") or len(search) > 128 or page < 0 or page > 1000:
             raise Blocked("Invalid preview inspection filter")
-        with self.store.connect() as db:
-            task = self._public(self._row(db, token, user), db)
-            if task["state"] != "completed" or task["expired"]:
-                raise Blocked("Preview is not complete or has expired; create a fresh preview")
-            row = db.execute(
-                "SELECT document FROM previews WHERE id=? AND user=? AND created>=?",
-                (task["preview_id"], user, time.time() - 900),
-            ).fetchone()
-            if not row:
-                raise Blocked("Preview expired; create a fresh preview")
-        inspection = json.loads(row[0])["plan"]["inspection"]
+        inspection = self._inspection(token, user)
         entries = inspection[view]
         query = search.casefold().strip()
         matches = [
@@ -280,3 +279,31 @@ class PreviewService:
             "preserved_samples": inspection["preserved_samples"],
             "preserved_limit_per_category": inspection["preserved_limit_per_category"],
         }
+
+    def hours(self, token, user, camera, page):
+        if page < 0 or page > 2000:
+            raise Blocked("Invalid time-window page")
+        with self.inspection_lock:
+            inspection = self._inspection(token, user)
+            if "hours" not in inspection:
+                raise Blocked("This older preview has no grouped summary; create a new preview")
+            entries = [entry for entry in inspection["hours"] if entry["camera"] == camera]
+            return {
+                "items": entries[page * 12 : (page + 1) * 12],
+                "matched": len(entries),
+                "page": page,
+                "page_size": 12,
+            }
+
+    def _inspection(self, token, user):
+        with self.store.connect() as db:
+            task = self._public(self._row(db, token, user), db)
+            if task["state"] != "completed" or task["expired"]:
+                raise Blocked("Preview is not complete or has expired; create a fresh preview")
+            row = db.execute(
+                "SELECT document FROM previews WHERE id=? AND user=? AND created>=?",
+                (task["preview_id"], user, time.time() - 900),
+            ).fetchone()
+            if not row:
+                raise Blocked("Preview expired; create a fresh preview")
+        return json.loads(row[0])["plan"]["inspection"]

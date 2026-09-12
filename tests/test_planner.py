@@ -219,8 +219,44 @@ def test_large_archive_bounded_memory_and_plan_cap(env, inspect):
     assert time.monotonic() - start < 20
     if inspect:
         assert result["inspection"]["preserved_samples"]["recordings"] == {
-            "shown": 500,
+            "shown": 25,
             "total": 100000,
         }
     with pytest.raises(Blocked, match="limit"):
         plan(env, max_items=1)
+
+
+def test_known_over_limit_selection_fails_before_per_file_access(env, monkeypatch):
+    for n in range(3):
+        recording(env, id=f"old-{n}")
+
+    def unexpected(*args, **kwargs):
+        raise AssertionError("Should reject before any per-file NFS access")
+
+    monkeypatch.setattr(env.storage, "file", unexpected)
+    with pytest.raises(Blocked, match="combined database-record/media-file limit"):
+        plan(env, max_items=2)
+
+
+@pytest.mark.parametrize(
+    "table,column",
+    [
+        ("previews", "path"),
+        ("reviewsegment", "thumb_path"),
+        ("export", "video_path"),
+        ("export", "thumb_path"),
+    ],
+)
+def test_bulk_path_check_preserves_references_outside_selected_camera(env, table, column):
+    recording(env)
+    if table == "reviewsegment":
+        review(env, id="kept", camera="side")
+    else:
+        insert(env, table, id="kept", camera="side")
+    with sqlite3.connect(env.db) as db:
+        db.execute(
+            f'UPDATE "{table}" SET "{column}"=? WHERE id=?',
+            ("/media/frigate/recordings/r-old.mp4", "kept"),
+        )
+    with pytest.raises(Blocked, match="referenced by protected history"):
+        plan(env)

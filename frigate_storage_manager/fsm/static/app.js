@@ -1,6 +1,7 @@
 "use strict";
 import { relativeCutoff } from "./time.mjs";
 import { createPreviewUI } from "./previews.mjs";
+import { renderOverview } from "./overview.mjs";
 const $ = (id) => document.getElementById(id);
 let state = {}, approved = null, validatedTarget = null;
 let previewUI = null;
@@ -36,7 +37,7 @@ function boundary(){
   try{const value=cutoff();$("boundary").textContent=`Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}. Before ${value.toLocaleString()} (${value.toISOString()}). A day means 24 hours; repeated DST times use the first occurrence.`;}
   catch(e){$("boundary").textContent=e.message;}
 }
-function list(id, values){$(id).replaceChildren();for(const [key,value] of Object.entries(values)){const dt=document.createElement("dt"),dd=document.createElement("dd");dt.textContent=labels[key]||key;dd.textContent=Number(value).toLocaleString();$(id).append(dt,dd);}}
+function list(id, values){$(id).replaceChildren();for(const [key,value] of Object.entries(values)){if(!value)continue;const dt=document.createElement("dt"),dd=document.createElement("dd");dt.textContent=labels[key]||key;dd.textContent=Number(value).toLocaleString();$(id).append(dt,dd);}}
 async function refreshStatus(){
   state=await api("status");$("user").textContent=state.user_id;$("probe").disabled=!state.is_admin||!validatedTarget;
   const jobs=$("jobs");jobs.replaceChildren();if(!state.jobs.length)jobs.textContent="No cleanup jobs.";
@@ -78,8 +79,9 @@ previewUI=createPreviewUI({api,bytes,labels,onBusy:syncControls,onError:error,in
   },
   onReady:(task)=>{
     approved=task.expired?null:{...task,target:task.request.target};const r=task.result;
-    $("scope").textContent=`${task.request.target} · ${r.scope.cameras.join(", ")} · Before ${new Date(r.scope.cutoff_utc).toLocaleString()} (${r.scope.cutoff_utc}) · Exports ${r.scope.include_exports?"included by creation time":"preserved"}`;
+    $("scope").textContent=`${r.scope.cameras.join(", ")} · Footage ending before ${new Date(r.scope.cutoff_utc).toLocaleString(undefined,{dateStyle:"medium",timeStyle:"medium"})} · Exports ${r.scope.include_exports?"included":"kept"}`;
     $("recoverable").textContent=bytes(r.bytes);list("counts",r.counts);list("preserved",r.preserved);$("result-section").hidden=false;$("delete").disabled=task.expired||!state.destructive_enabled||!state.is_admin;
+    renderOverview(task,{api,bytes});
   }
 });
 act(async()=>{await refreshStatus();const data=await api("discovery");for(const item of data.apps){const option=document.createElement("option");option.value=item.slug;option.textContent=`${item.name} · ${item.slug} · ${item.version}`;$("target").append(option);}$("target").value=data.configured_target;$("connection").textContent=data.apps.length?"Select Frigate, then validate its storage.":"No installed Frigate app found.";await previewUI.acceptStatus(state,true);boundary();});

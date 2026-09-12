@@ -33,6 +33,7 @@ export function createPreviewUI({ api, bytes, labels, onBusy, onReady, onRequest
     if (task) {
       const r = task.request;
       $("preview-scope").textContent = `${r.target} · ${r.cameras.join(", ")} · Before ${new Date(r.cutoff).toLocaleString()} (${r.cutoff}) · Exports ${r.include_exports ? "included" : "preserved"}`;
+      $("preview-timings").textContent = Object.entries(task.timings || {}).sort((a,b)=>b[1]-a[1]).map(([phase,seconds])=>`${phases[phase] || phase}: ${seconds.toFixed(1)} seconds`).join("\n");
     }
   }
 
@@ -61,7 +62,7 @@ export function createPreviewUI({ api, bytes, labels, onBusy, onReady, onRequest
     } else if (task.state === "completed") {
       $("preview-connection").textContent = task.expired
         ? "This preview expired or was replaced. Its summary remains visible; create a fresh preview to inspect items."
-        : `Saved until ${new Date(task.expires_at * 1000).toLocaleString()}. Up to four previews are retained. This is a snapshot, not a live inventory.`;
+        : `Saved until ${new Date(task.expires_at * 1000).toLocaleTimeString()}. You can reopen this page to review it.`;
       const key = `${task.id}:${task.expired}`;
       if (lastShown !== key) {
         lastShown = key; page = 0; generation++;
@@ -70,7 +71,9 @@ export function createPreviewUI({ api, bytes, labels, onBusy, onReady, onRequest
         $("inspection-search").value = "";
         $("inspection-view").value = "selected";
         $("inspection-kind").value = "";
-        if (!task.expired) await loadItems();
+        $("technical-details").open = false;
+        $("inspection").open = false;
+        $("inspection-items").replaceChildren();
       }
     } else {
       $("preview-connection").textContent = task.error || "Create a new preview to retry.";
@@ -144,6 +147,7 @@ export function createPreviewUI({ api, bytes, labels, onBusy, onReady, onRequest
     try {
       const data = await api(`previews/${token}/items?${params}`);
       if (serial !== generation || token !== task?.id) return;
+      $("inspection-sample-limit").textContent = data.preserved_limit_per_category;
       const body = $("inspection-items"); body.replaceChildren();
       for (const item of data.items) {
         const row = document.createElement("tr");
@@ -181,6 +185,7 @@ export function createPreviewUI({ api, bytes, labels, onBusy, onReady, onRequest
     const option = document.createElement("option"); option.value = kind; option.textContent = labels[kind] || kind; $("inspection-kind").append(option);
   }
   $("inspection-form").onsubmit = (e) => { e.preventDefault(); page = 0; loadItems(); };
+  $("inspection").ontoggle = () => { if($("inspection").open)loadItems(); };
   for (const id of ["inspection-view", "inspection-kind"]) $(id).onchange = () => { page = 0; loadItems(); };
   $("inspection-previous").onclick = () => { page--; loadItems(); };
   $("inspection-next").onclick = () => { page++; loadItems(); };

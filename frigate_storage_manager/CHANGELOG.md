@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.1.4
+
+- Replace the default row listing with camera summaries: selected footage duration,
+  recording time ranges, recoverable space, and plain-language removal/keep decisions.
+- Group recording details by starting hour, loading at most 12 time ranges per page
+  when expanded. Camera duration excludes gaps and double-counted overlapping footage.
+- Collapse individual IDs, counts, prior previews and timing diagnostics by default.
+  Keep exact preserved totals, while reducing diagnostic examples to 25 per category.
+- Store per-phase timings and reduce progress journal writes to once every two
+  seconds plus phase changes. The live latency increase remains under investigation.
+- Check protected file references in five batched queries and reject known oversized
+  selections before per-file NFS access. Explain the combined record/file limit.
+- Keep every cleanup/recovery release gate disabled.
+
 ## 0.1.3
 
 - Run previews in one background worker with durable phase, elapsed time and

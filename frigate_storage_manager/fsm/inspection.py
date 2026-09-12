@@ -1,9 +1,10 @@
 """Bounded, metadata-only explanations from the planner's own read snapshot."""
 
 from .database import VECTORS
+from .overview import overview
 
 HISTORY = ("event", "reviewsegment", "recordings", "previews", "export")
-PRESERVED_LIMIT = 500  # Per category; never copy a whole long-retention archive.
+PRESERVED_LIMIT = 25  # Diagnostic examples only; overview counts cover all kept history.
 
 
 def text(value):
@@ -194,7 +195,10 @@ def inspect_plan(db, plan, tables, progress):
             preserved.append(item(table, row, explanation, witness))
             count += 1
         samples[table] = {"shown": count, "total": plan["preserved"][table]}
+    aggregate, hours = overview(db, plan, selected)
     return {
+        "overview": aggregate,
+        "hours": hours,
         "selected": selected,
         "preserved": preserved,
         "preserved_samples": samples,

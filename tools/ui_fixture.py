@@ -5,13 +5,14 @@ This simulates ingress solely for the disposable fake installation, with deletio
 """
 
 import argparse
+import sqlite3
 import tempfile
 import time
 from pathlib import Path
 
 import fsm.previews
+from conftest import T, event, recording, review
 from conftest import env as fixture
-from conftest import event, recording, review
 from fsm.safety import Blocked
 from fsm.storage import StorageBlocked
 from fsm.web import create_app
@@ -19,6 +20,11 @@ from waitress import serve
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--storage-error", action="store_true", help="Show synthetic mount diagnostics")
+parser.add_argument(
+    "--many-recordings",
+    action="store_true",
+    help="Generate thousands of short synthetic segments for UI review",
+)
 parser.add_argument(
     "--preview-error", action="store_true", help="Fail the synthetic background preview"
 )
@@ -37,6 +43,36 @@ with tempfile.TemporaryDirectory(prefix="fsm-ui-") as temp:
     review(data, events=["e-old"])
     recording(data, id="kept", camera="side")
     event(data, id="bookmark", camera="side", bookmark=1)
+    if args.many_recordings:
+        with sqlite3.connect(data.db) as db:
+            for n in range(2000):
+                path = data.root / f"recordings/segment-{n}.mp4"
+                path.write_bytes(b"synthetic UI fixture")
+                start = T - 30000 + n * 12
+                db.execute(
+                    "INSERT INTO recordings(id,camera,path,start_time,end_time,duration,segment_size) VALUES (?,'front',?,?,?,10,1)",
+                    (
+                        f"segment-{n}",
+                        f"/media/frigate/recordings/segment-{n}.mp4",
+                        start,
+                        start + 10,
+                    ),
+                )
+            db.executemany(
+                "INSERT INTO recordings(id,camera,path,start_time,end_time,duration,segment_size) VALUES (?,'front',?,?,?,10,1)",
+                (
+                    (
+                        f"kept-{n}",
+                        f"/media/frigate/recordings/kept-{n}.mp4",
+                        T + n * 10,
+                        T + n * 10 + 10,
+                    )
+                    for n in range(2000)
+                ),
+            )
+        db.close()
+        for n in range(80):
+            event(data, id=f"recent-{n}", start=T + n, end=T + n + 1)
     if args.storage_error:
 
         def unavailable(*args, **kwargs):

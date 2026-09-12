@@ -3,7 +3,7 @@
 An independent Home Assistant OS app for validating Frigate storage and previewing
 coherent cleanup of old recordings and associated history, without changing retention.
 
-**0.1.3 is an experimental, installable validation release. Deletion is disabled in
+**0.1.4 is an experimental, installable validation release. Deletion is disabled in
 the shipped code. Live discovery, NFS validation and read-only previews have worked;
 write access, lifecycle control, cleanup and recovery remain unvalidated on HAOS.**
 The full cleanup/recovery engine is implemented and tested with synthetic media and
@@ -26,8 +26,9 @@ from this repository; no registry image is required.
 1. Select the installed Frigate app explicitly.
 2. Validate its database, capture settings, Supervisor role and existing NFS mount.
 3. Select cameras, a cutoff and optionally completed exports, then preview cleanup.
-4. Follow the phase and elapsed time, then inspect selected and preserved records
-   with their reasons. Reopening the page retrieves your active or saved preview.
+4. Review selected footage duration, recording time ranges, estimated space and
+   what stays for each camera. Individual records are optional technical details.
+   Reopening the page retrieves your active or saved preview.
 
 Frigate continues recording/detection during previews. Read the
 [installation guide and live checklist](frigate_storage_manager/DOCS.md).

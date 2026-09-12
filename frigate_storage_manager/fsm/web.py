@@ -215,6 +215,14 @@ def create_app(installation, storage, store, engine):
             )
         )
 
+    @app.get("/api/previews/<token>/hours")
+    def preview_hours(token):
+        try:
+            page = int(request.args.get("page", "0"))
+        except ValueError:
+            raise Blocked("Invalid time-window page") from None
+        return jsonify(previews.hours(token, g.user, request.args.get("camera", ""), page))
+
     @app.post("/api/delete")
     def delete():
         administrator()
