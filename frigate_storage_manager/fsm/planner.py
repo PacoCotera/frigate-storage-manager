@@ -67,7 +67,12 @@ def build_plan(
         "mount": evidence["identity"],
         "rows": {},
         "files": [],
-        "counts": {},
+        "counts": {
+            "snapshots": 0,
+            "event_thumbnails": 0,
+            "review_thumbnails": 0,
+            "export_thumbnails": 0,
+        },
         "preserved": {},
         "bytes": 0,
         "warnings": [],

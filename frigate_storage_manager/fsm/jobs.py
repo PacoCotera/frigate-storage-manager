@@ -18,7 +18,14 @@ from .safety import Blocked, atomic_json, digest, file_identity, read_json, safe
 from .storage import move_file, private_directory, probe_directory, unlink_file
 
 TERMINAL = {"completed", "rolled_back", "needs_preview", "rejected"}
-STAGED_PHASES = {"prepared", "staging", "committing", "committed", "purging", "restarting"}
+
+
+class StateConnection(sqlite3.Connection):
+    def __exit__(self, *args):
+        try:
+            return super().__exit__(*args)
+        finally:
+            self.close()
 
 
 class NeedsPreview(Blocked):
@@ -40,7 +47,7 @@ class JobStore:
 
     def connect(self):
         safe_path(self.root, self.path.name, exists=False)
-        db = sqlite3.connect(self.path, timeout=5)
+        db = sqlite3.connect(self.path, timeout=5, factory=StateConnection)
         db.execute("PRAGMA synchronous=FULL")
         return db
 
@@ -88,6 +95,13 @@ class JobStore:
             }
             db.execute("INSERT INTO jobs VALUES (?,?,?)", (token, time.time(), json.dumps(job)))
             db.execute("DELETE FROM previews WHERE id=?", (token,))
+            # Retain at most 100 resolved receipts without a retained backup.
+            disposable = [
+                j["id"]
+                for j in self.jobs(db)
+                if j["phase"] in TERMINAL and (not j.get("backup") or j.get("backup_removed"))
+            ]
+            db.executemany("DELETE FROM jobs WHERE id=?", ((x,) for x in disposable[100:]))
         return job, document
 
     def save(self, job):
@@ -122,6 +136,15 @@ class Engine:
         self.store, self.installation, self.storage = store, installation, storage
         self.gate, self.hook = gate, hook
         self.lock = threading.Lock()
+        self.last_guard = 0.0
+
+    def guard(self, job, index):
+        # Avoid thousands of Supervisor HTTP calls during a large cleanup. File
+        # identity/no-follow/same-device checks still run on every operation.
+        now = time.monotonic()
+        if index % 128 == 0 or now - self.last_guard >= 2:
+            self.verify(job)
+            self.last_guard = now
 
     def phase(self, job, phase):
         job["phase"] = phase
@@ -240,7 +263,15 @@ class Engine:
             target = sqlite3.connect(backup)
             try:
                 target.execute("PRAGMA journal_mode=OFF")
-                source.backup(target, pages=256)
+                deadline = time.monotonic() + 900
+
+                def backup_progress(status, remaining, total):
+                    if time.monotonic() > deadline:
+                        raise Blocked("Database backup exceeded the 15-minute maintenance budget")
+                    self.guard(job, total - remaining)
+
+                source.backup(target, pages=256, progress=backup_progress)
+                target.execute("PRAGMA journal_mode=DELETE")
             finally:
                 source.close()
                 target.close()
@@ -271,13 +302,14 @@ class Engine:
             self.phase(job, "prepared")
             self.phase(job, "staging")
             for index, file in enumerate(current["files"]):
-                self.verify(job)
+                self.guard(job, index)
                 stage = self.staged(job, index)
                 self.hook("before_stage")
                 move_file(self.storage.root, file["path"], stage, file["identity"])
                 self.hook("after_stage")
                 job["processed"] = index + 1
-                self.store.save(job)
+                if index % 128 == 0:
+                    self.store.save(job)
             self.verify(job)
             self.phase(job, "committing")
             self.commit(job, current, db_path)
@@ -419,7 +451,7 @@ class Engine:
         self.phase(job, "purging" if committed else "staging")
         indices = range(len(files)) if committed else reversed(range(len(files)))
         for index in indices:
-            self.verify(job)
+            self.guard(job, index)
             file = files[index]
             source = self.storage.file(file["path"], exists=False)
             stage = self.storage.file(self.staged(job, index), exists=False)

@@ -29,6 +29,8 @@ paths outside expected categories block the operation.
   and at most 256 distinct cameras. Large archives are not materialized in Python.
 - `/data` holds settings, bounded previews and small jobs. Media/backups stay on NFS.
 - Five retained backups maximum; explicit disposal before another job. No hidden pruning.
+- Keep 100 recent resolved receipts plus the current job and retained backups; consumed/expired preview
+  IDs remain unusable even after an old receipt is removed.
 - Job status uses local state and does not touch NFS. Hard NFS can block syscalls beyond
   application deadlines; the manager does not claim it can cancel or repair such IO.
 
@@ -45,7 +47,9 @@ paths outside expected categories block the operation.
 5. Create a consistent metadata backup and immutable fsynced manifest on NFS, with
    0600 files inside 0700 directories. Incompatible permissions block maintenance.
 6. Persist staging intent, then rename each file to a deterministic staging name on
-   the same filesystem. Linux uses no-follow directory descriptors and parent fsync.
+  the same filesystem. Linux uses no-follow directory descriptors and parent fsync.
+  Supervisor/configuration rechecks occur at most two seconds or 128 files apart,
+  plus every phase boundary; each file still receives its own path/identity checks.
 7. Persist committing intent; use `BEGIN IMMEDIATE`, verify selected row signatures,
    delete known children/parents with bound parameters, and insert `_fsm_commit` in
    that same transaction. Commit uses FULL durability. Only the current witness is kept.

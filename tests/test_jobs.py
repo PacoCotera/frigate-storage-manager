@@ -305,3 +305,39 @@ def test_release_gate_precedes_all_mutations(env):
         engine.submit(token, "admin", signature)
     assert not env.store.jobs()
     assert ("stop", SLUG) not in env.supervisor.calls
+
+
+def test_lost_witness_in_committing_phase_refuses_to_restore_files(env):
+    recording(env)
+    env.engine.hook = crash_at("after_commit")
+    token, signature = approve(env, plan(env))
+    with pytest.raises(Crash):
+        env.engine.submit(token, "admin", signature, background=False)
+    with sqlite3.connect(env.db) as db:
+        db.execute("DELETE FROM _fsm_commit")
+    with pytest.raises(Blocked, match="ambiguous"):
+        fresh_engine(env).recover(token)
+    assert not (env.root / "recordings/r-old.mp4").exists()
+    assert env.supervisor.app["state"] == "stopped"
+
+
+def test_preview_user_and_confirmation_are_bound(env):
+    recording(env)
+    token, signature = approve(env, plan(env))
+    with pytest.raises(Blocked, match="another user"):
+        env.engine.submit(token, "other-user", signature, background=False)
+    with pytest.raises(Blocked, match="Confirmation"):
+        env.engine.submit(token, "admin", "incorrect", background=False)
+    assert not env.store.jobs()
+
+
+def test_stop_failure_leaves_job_unresolved_without_staging(env):
+    recording(env)
+    env.supervisor.fail_action = "stop"
+    result = submit(env)
+    assert result["phase"] == "stopping"
+    assert result["recovery_required"]
+    assert ids(env, "recordings") == ["r-old"]
+    assert not result.get("manifest")
+    env.supervisor.fail_action = None
+    assert fresh_engine(env).recover(result["id"])["phase"] == "rolled_back"

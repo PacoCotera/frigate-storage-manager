@@ -55,7 +55,7 @@ $("preview-form").onsubmit=(event)=>{event.preventDefault();act(async()=>{
     $("recoverable").textContent=bytes(r.bytes);list("counts",r.counts);list("preserved",r.preserved);$("result-section").hidden=false;$("delete").disabled=!state.destructive_enabled||!state.is_admin;$("result-section").scrollIntoView({behavior:"smooth",block:"nearest"});
   }finally{$("preview").disabled=false;}
 });};
-$("delete").onclick=()=>act(async()=>{if(!approved)return;if(confirm(`Delete selected history?\n${$("scope").textContent}\n${$("counts").textContent}\nEstimated media: ${bytes(approved.result.bytes)}\nFrigate pauses during cleanup. Deleted video cannot be restored from a metadata backup.`)){
+$("delete").onclick=()=>act(async()=>{if(!approved)return;const counts=Object.entries(approved.result.counts).map(([k,v])=>`${labels[k]||k}: ${v}`).join("\n");if(confirm(`Delete selected history?\n${$("scope").textContent}\n${counts}\nEstimated media: ${bytes(approved.result.bytes)}\nFrigate pauses during cleanup. Deleted video cannot be restored from a metadata backup.`)){
   await api("delete",{preview_id:approved.preview_id,confirmation:approved.confirmation});invalidate();await refreshStatus();}});
 act(async()=>{await refreshStatus();const data=await api("discovery");for(const item of data.apps){const option=document.createElement("option");option.value=item.slug;option.textContent=`${item.name} · ${item.slug} · ${item.version}`;$("target").append(option);}$("target").value=data.configured_target;$("connection").textContent=data.apps.length?"Select Frigate, then validate its storage.":"No installed Frigate app found.";boundary();});
 // Only poll small local job records while a job is unresolved; never scan media.
