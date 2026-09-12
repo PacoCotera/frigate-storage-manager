@@ -4,13 +4,19 @@ Run from the repo: PYTHONPATH=frigate_storage_manager:tests python tools/ui_fixt
 This simulates ingress solely for the disposable fake installation, with deletion locked.
 """
 
+import argparse
 import tempfile
 from pathlib import Path
 
 from conftest import env as fixture
 from conftest import event, recording, review
+from fsm.storage import StorageBlocked
 from fsm.web import create_app
 from waitress import serve
+
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument("--storage-error", action="store_true", help="Show synthetic mount diagnostics")
+args = parser.parse_args()
 
 with tempfile.TemporaryDirectory(prefix="fsm-ui-") as temp:
     data = fixture.__wrapped__(Path(temp))
@@ -19,6 +25,26 @@ with tempfile.TemporaryDirectory(prefix="fsm-ui-") as temp:
     review(data, events=["e-old"])
     recording(data, id="kept", camera="side")
     event(data, id="bookmark", camera="side", bookmark=1)
+    if args.storage_error:
+
+        def unavailable(*args, **kwargs):
+            raise StorageBlocked(
+                "This app sees ext4 at /media/frigate; NFS access is not confirmed. See Validation details. Cleanup remains blocked.",
+                {
+                    "media_path": "/media/frigate",
+                    "opened_mount": {"fstype": "ext4", "source": "/dev/fixture"},
+                    "supervisor_nfs_mounts": [
+                        {
+                            "name": "frigate",
+                            "state": "active",
+                            "server": "fixture",
+                            "path": "/media",
+                        }
+                    ],
+                },
+            )
+
+        data.storage.validate = unavailable
     app = create_app(data.installation, data.storage, data.store, data.engine)
 
     def ingress(environ, start_response):

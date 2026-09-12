@@ -217,7 +217,11 @@ def test_kernel_supervisor_mount_agreement(tmp_path, monkeypatch, fstype, state,
     )
     monkeypatch.setattr("fsm.storage.safe_path", lambda x: x)
     monkeypatch.setattr(
-        "fsm.storage.shutil.disk_usage", lambda _: SimpleNamespace(total=100, used=60, free=40)
+        "fsm.storage.filesystem_evidence",
+        lambda *_: (
+            list(mount_entries(mountinfo.read_text()))[-1],
+            {"total": 100, "used": 60, "free": 40},
+        ),
     )
     store = Storage("/media/frigate", supervisor, mountinfo)
     if blocked:

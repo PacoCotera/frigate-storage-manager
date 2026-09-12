@@ -8,7 +8,7 @@ ROOT = Path(__file__).parents[1]
 
 def test_manifest_supported_mappings_ingress_and_permissions():
     config = yaml.safe_load((ROOT / "frigate_storage_manager/config.yaml").read_text())
-    assert config["version"] == VERSION == "0.1.0"
+    assert config["version"] == VERSION == "0.1.1"
     assert config["arch"] == ["amd64"]
     assert config["ingress"] and config["panel_admin"]
     assert config["hassio_role"] == "manager" and config["hassio_api"]

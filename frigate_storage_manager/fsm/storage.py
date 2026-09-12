@@ -4,11 +4,18 @@ import contextlib
 import os
 import re
 import secrets
-import shutil
 import stat
 from pathlib import Path, PurePosixPath
 
 from .safety import Blocked, file_identity, relative, safe_path, sync_dir
+
+
+class StorageBlocked(Blocked):
+    """Storage failure with explicitly selected, credential-free evidence."""
+
+    def __init__(self, message, diagnostics):
+        super().__init__(message)
+        self.diagnostics = diagnostics
 
 
 def mount_entries(text):
@@ -30,6 +37,51 @@ def mount_entries(text):
         }
 
 
+def descriptor_mount_id(fd):
+    info = Path(f"/proc/self/fdinfo/{fd}").read_text()
+    match = re.search(r"^mnt_id:\s*(\d+)\s*$", info, re.MULTILINE)
+    if not match:
+        raise Blocked("Linux did not provide the opened media directory's mount ID")
+    return match[1]
+
+
+def filesystem_evidence(root, mountinfo):
+    # Opening the directory activates an existing HAOS automount. lstat alone
+    # does not. Read mountinfo afterwards, and select the descriptor's mount ID:
+    # an autofs trigger and its NFS mount can have the same mountpoint, and a
+    # longer matching path can even belong to a hidden mount tree.
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    fd = os.open(root, flags)
+    try:
+        mount_id = descriptor_mount_id(fd)
+        matches = [m for m in mount_entries(mountinfo.read_text()) if m["mount_id"] == mount_id]
+        if len(matches) != 1 or not root.is_relative_to(Path(matches[0]["mountpoint"])):
+            raise Blocked(
+                "Opened media mount is missing from this app's mount table; retry validation"
+            )
+        mount = matches[0]
+        opened = os.fstat(fd)
+        if mount["device"] != f"{os.major(opened.st_dev)}:{os.minor(opened.st_dev)}":
+            raise Blocked("Opened media device differs from its kernel mount entry")
+        capacity = os.fstatvfs(fd)
+        # A detach/overmount during the probe must not validate a stale descriptor.
+        current = os.open(root, flags)
+        try:
+            if descriptor_mount_id(current) != mount_id:
+                raise Blocked(
+                    "Media mount changed during validation; retry after storage stabilizes"
+                )
+        finally:
+            os.close(current)
+        return mount, {
+            "total": capacity.f_blocks * capacity.f_frsize,
+            "used": (capacity.f_blocks - capacity.f_bfree) * capacity.f_frsize,
+            "free": capacity.f_bavail * capacity.f_frsize,
+        }
+    finally:
+        os.close(fd)
+
+
 class Storage:
     def __init__(self, root, supervisor, mountinfo=Path("/proc/self/mountinfo")):
         self.root, self.supervisor, self.mountinfo = Path(root), supervisor, mountinfo
@@ -38,26 +90,41 @@ class Storage:
         relative(str(self.root.relative_to("/media")))
 
     def validate(self, expected=None):
-        safe_path(self.root)
-        candidates = [
+        diagnostics = {"media_path": str(self.root)}
+        try:
+            return self._validate(expected, diagnostics)
+        except Blocked as exc:
+            raise StorageBlocked(str(exc), diagnostics) from None
+        except OSError as exc:
+            diagnostics["os_error"] = exc.errno
+            raise StorageBlocked(
+                "This app could not access its media mount; see Validation details", diagnostics
+            ) from None
+
+    def _validate(self, expected, diagnostics):
+        configured_mounts = [
             m
-            for m in mount_entries(self.mountinfo.read_text())
-            if self.root.is_relative_to(Path(m["mountpoint"]))
+            for m in self.supervisor.request("/mounts").get("mounts", [])
+            if m.get("usage") == "media" and m.get("type") == "nfs"
         ]
-        if not candidates:
-            raise Blocked("No kernel mount covers the selected media directory")
-        mount = max(candidates, key=lambda m: len(m["mountpoint"]))
+        diagnostics["supervisor_nfs_mounts"] = [
+            {k: m.get(k) for k in ("name", "state", "user_path", "server", "path", "read_only")}
+            for m in configured_mounts
+        ]
+        safe_path(self.root)
+        mount, capacity = filesystem_evidence(self.root, self.mountinfo)
+        diagnostics["opened_mount"] = {
+            k: mount[k] for k in ("mount_id", "device", "root", "mountpoint", "fstype", "source")
+        }
         if mount["fstype"] not in ("nfs", "nfs4"):
             raise Blocked(
-                "Media is not on a mounted NFS filesystem; refusing a local fallback directory"
+                f"This app sees {mount['fstype']} at {self.root}; NFS access is not confirmed. "
+                "See Validation details. Cleanup remains blocked."
             )
         matches = [
             m
-            for m in self.supervisor.request("/mounts").get("mounts", [])
-            if m.get("usage") == "media"
-            and m.get("type") == "nfs"
-            and m.get("user_path")
-            and self.root.is_relative_to(Path(m["user_path"]))
+            for m in configured_mounts
+            if m.get("user_path") and self.root.is_relative_to(Path(m["user_path"]))
         ]
         if len(matches) != 1 or matches[0].get("state") != "active":
             raise Blocked("Supervisor does not confirm exactly one active NFS media mount")
@@ -71,13 +138,10 @@ class Storage:
         # recovery then needs explicit operator investigation.
         if expected is not None and ident != expected:
             raise Blocked("Media mount identity changed; recovery needs investigation")
-        capacity = shutil.disk_usage(self.root)
         readonly = "ro" in (mount["options"] + "," + mount["super_options"]).split(",")
         return {
             "identity": ident,
-            "total": capacity.total,
-            "used": capacity.used,
-            "free": capacity.free,
+            **capacity,
             "read_only": readonly,
             "available": True,
         }

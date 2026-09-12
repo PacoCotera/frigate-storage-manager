@@ -10,7 +10,7 @@
 <main>
   <header><span class="eyebrow">HOME ASSISTANT · STORAGE</span><h1>Frigate Storage Manager</h1>
     <p>Understand your storage. Preview a cleanup without interrupting Frigate.</p></header>
-  <aside class="notice"><strong>Read-only validation release · 0.1.0</strong>
+  <aside class="notice"><strong>Read-only validation release · {{ version }}</strong>
     <p>Deletion and recovery mutations are locked until this HAOS installation is validated.
        Previews keep Frigate running and preserve its configuration.</p></aside>
   <div id="error" role="alert" hidden></div>
@@ -24,7 +24,7 @@
       <div><span>Media free</span><strong id="free">—</strong></div>
       <div><span>Media total</span><strong id="total">—</strong></div>
     </div>
-    <details><summary>Validation details</summary><pre id="diagnostics">No validation yet.</pre>
+    <details id="validation-details"><summary>Validation details</summary><pre id="diagnostics">No validation yet.</pre>
       <p>Your HA user ID: <code id="user"></code>. An administrator can add it to this app’s
         <code>admin_user_ids</code> option to permit disposable write probes. Probes create and remove
         a tiny temporary file in the selected media and database directories.</p></details>

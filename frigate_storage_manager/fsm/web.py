@@ -14,7 +14,7 @@ from .database import connect, validate_schema
 from .jobs import TERMINAL
 from .planner import build_plan, camera_names, summary
 from .safety import Blocked, digest, file_identity, identifier
-from .storage import probe_directory
+from .storage import StorageBlocked, probe_directory
 
 
 def create_app(installation, storage, store, engine):
@@ -64,7 +64,10 @@ def create_app(installation, storage, store, engine):
 
     @app.errorhandler(Blocked)
     def blocked(error):
-        return jsonify(error=str(error)), 409
+        body = {"error": str(error)}
+        if isinstance(error, StorageBlocked):
+            body["diagnostics"] = error.diagnostics
+        return jsonify(body), 409
 
     @app.errorhandler(Exception)
     def failed(error):
@@ -86,7 +89,7 @@ def create_app(installation, storage, store, engine):
 
     @app.get("/")
     def index():
-        return render_template("index.html")
+        return render_template("index.html", version=VERSION)
 
     @app.get("/api/status")
     def status():

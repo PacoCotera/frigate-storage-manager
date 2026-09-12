@@ -6,7 +6,7 @@ const bytes = (value) => { let n=Number(value), u=0; const units=["B","KiB","MiB
 function error(e){$("error").textContent=e.message;$("error").hidden=false;}
 async function api(path, body){
   const response=await fetch(`api/${path}`,body === undefined ? {cache:"no-store"} : {method:"POST",headers:{"Content-Type":"application/json","X-FSM-CSRF":state.csrf},body:JSON.stringify(body)});
-  const data=await response.json(); if(!response.ok) throw new Error(data.error || "Request failed"); return data;
+  const data=await response.json(); if(!response.ok){const failure=new Error(data.error || "Request failed");failure.diagnostics=data.diagnostics;throw failure;} return data;
 }
 function invalidate(){approved=null;$("result-section").hidden=true;$("delete").disabled=true;}
 function cutoff(){
@@ -38,11 +38,11 @@ async function refreshStatus(){
 }
 async function act(fn){$("error").hidden=true;try{await fn();}catch(e){error(e);}}
 $("validate").onclick=()=>act(async()=>{
-  invalidate();validatedTarget=null;$("preview").disabled=true;$("validate").disabled=true;$("connection").textContent="Validating selected database, schema, NFS and Supervisor access…";
+  invalidate();validatedTarget=null;$("preview").disabled=true;$("probe").disabled=true;$("validate").disabled=true;$("diagnostics").textContent="Validation in progress…";$("connection").textContent="Validating selected database, schema, NFS and Supervisor access…";
   try{const data=await api("validate",{target:$("target").value});validatedTarget=data.target;$("connection").textContent=`${data.target} · Frigate ${data.version} · ${data.state} · NFS available`;
     for(const key of ["used","free","total"])$(key).textContent=bytes(data.media[key]);$("storage").hidden=false;$("diagnostics").textContent=JSON.stringify(data,null,2);
     $("cameras").replaceChildren();for(const name of data.cameras){const option=document.createElement("option");option.value=name;option.textContent=name+(data.historical_cameras.includes(name)?" (historical)":"");option.selected=true;$("cameras").append(option);}$("preview").disabled=state.recovery_required;$("probe").disabled=!state.is_admin;
-  }catch(e){$("storage").hidden=true;$("connection").textContent="Validation blocked. An unavailable mount is never treated as an empty library.";throw e;}finally{$("validate").disabled=false;}
+  }catch(e){$("storage").hidden=true;$("connection").textContent="Validation blocked. See the details below.";$("diagnostics").textContent=JSON.stringify({error:e.message,...(e.diagnostics||{})},null,2);$("validation-details").open=true;throw e;}finally{$("validate").disabled=false;}
 });
 $("probe").onclick=()=>act(async()=>{const result=await api("probe",{target:validatedTarget});$("diagnostics").textContent+="\n"+JSON.stringify(result,null,2);});
 $("target").onchange=()=>{validatedTarget=null;$("preview").disabled=true;$("probe").disabled=true;invalidate();};

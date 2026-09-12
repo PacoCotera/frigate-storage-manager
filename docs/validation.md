@@ -29,9 +29,9 @@ CI runs Linux/Windows tests, reproduces all 32 pinned upstream migrations, build
 actual amd64 app context, verifies runtime dependencies and release gate, boots the
 image and checks direct non-ingress rejection. None of these install into HAOS.
 
-## Actual HAOS validation — pending
+## Actual HAOS validation — in progress
 
-- [ ] Install and start on the existing amd64 HAOS VM.
+- [x] Install, start and display the ingress UI on the existing HAOS VM (user screenshot).
 - [ ] Verify ingress identity and write authorization.
 - [ ] Discover/select the actual Frigate identifier/version/state.
 - [ ] Verify the supported local database mapping and real schema.
@@ -44,3 +44,30 @@ image and checks direct non-ingress rejection. None of these install into HAOS.
 
 No live recordings have been deleted, real Frigate lifecycle changed, or live Frigate
 configuration modified by this development work.
+
+### 2026-09-11: first live feedback and 0.1.1 fix
+
+The user reported Core 2026.9.2, Supervisor 2026.09.0, HAOS 18.2 and Frontend
+20260826.7. The 0.1.0 ingress UI loaded but validation reported that the media path
+was not NFS; the user confirmed their share is NFS. The screenshot alone does not
+identify which mount entry the app selected or prove real database/schema access.
+
+Supervisor [2026.09.0 network mounts](https://github.com/home-assistant/supervisor/blob/2026.09.0/supervisor/mounts/mount.py)
+use autofs and propagate them through the supported
+[media mapping](https://github.com/home-assistant/supervisor/blob/2026.09.0/supervisor/docker/app.py).
+The old longest-path selection can pick the hidden autofs entry at the same path
+even when NFS is active. 0.1.1 instead opens the directory read-only, matches
+[`fdinfo.mnt_id`](https://man7.org/linux/man-pages/man5/proc_pid_fdinfo.5.html) to
+[`mountinfo`](https://man7.org/linux/man-pages/man5/proc_pid_mountinfo.5.html), and
+checks the device and mount stability. It preserves source/state requirements.
+
+Regression cases cover stacked autofs/NFS in either table order, dormant automount
+activation, hidden longer paths, local fallback, missing/changing mount IDs,
+device/source/state mismatches, unreachable mounts and credential-free failure
+details. Linux CI also exercises real unprivileged `/proc` descriptor evidence.
+The local 0.1.1 suite passed 125 tests with six platform/privilege skips. Browser QA
+with `tools/ui_fixture.py --storage-error` confirmed that a failed validation opens
+the diagnostic details, displays the actual filesystem and keeps preview/probe
+controls disabled. Lint, formatting and JavaScript syntax checks passed.
+Real NFS access and the explanation for this installation remain to be confirmed
+by rerunning validation with 0.1.1. Deletion remains disabled.

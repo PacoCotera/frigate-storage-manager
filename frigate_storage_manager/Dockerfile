@@ -1,5 +1,5 @@
 FROM python:3.12.12-slim-bookworm
-ARG BUILD_VERSION=0.1.0
+ARG BUILD_VERSION=0.1.1
 ARG BUILD_ARCH=amd64
 LABEL io.hass.name="Frigate Storage Manager" \
       io.hass.description="Frigate storage validation and read-only cleanup previews" \

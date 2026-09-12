@@ -154,7 +154,7 @@ class Engine:
     def submit(self, token, user, confirmation, *, background=True):
         if not self.gate():
             raise Blocked(
-                "Deletion is disabled in 0.1.0 pending live HAOS validation and a reviewed release"
+                "Deletion is disabled pending live HAOS validation and a reviewed release"
             )
         if not self.lock.acquire(blocking=False):
             raise Blocked("A maintenance worker is already active")

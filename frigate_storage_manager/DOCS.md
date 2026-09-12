@@ -18,7 +18,7 @@ Install from the repository/feature branch in README, start the app and choose
 | `admin_user_ids` | `[]` | HA user IDs authorized for disposable probes and future maintenance. Your ID appears under Validation details. |
 | `max_plan_items` | `10000` | Combined selected-row/file cap, range 100–20000. Choose an earlier cutoff/fewer cameras if exceeded. |
 
-There is **no deletion-enable option** in 0.1.0. Options and environment variables
+There is **no deletion-enable option** in 0.1.1. Options and environment variables
 cannot unlock it. Enablement requires a reviewed release after live validation.
 
 ## Real HAOS checklist
@@ -64,8 +64,15 @@ Unindexed orphan files, training images, faces, models and logs are outside scop
 
 - **Database mismatch:** verify slug and relative path. Private app `/data` cannot
   substitute for `addon_config`. No host-access workaround is used.
-- **NFS unavailable/source mismatch:** inspect HA Network Storage. Kernel and
-  Supervisor must agree on one active share. Different source aliases fail closed.
+- **NFS unavailable/source mismatch:** open **Validation details**, including on
+  failed validation. Compare `media_path`, `opened_mount.fstype`/`source`, and
+  `supervisor_nfs_mounts`. Kernel and Supervisor must agree on one active share.
+  Different source aliases fail closed. These details include private server/share
+  names; redact them before posting publicly, keeping matching values consistent.
+  Version 0.1.0 could incorrectly select an `autofs` entry underneath a working NFS
+  mount on Supervisor 2026.09.0. Update this manager to 0.1.1 and revalidate first.
+  No Frigate restart, share recreation, or server configuration change is needed
+  for this app fix. If it still fails, retain the new evidence for investigation.
 - **Probe fails:** inspect permissions/read-only settings. The manager never changes
   recording permissions or storage-server configuration.
 - **Unsupported schema/version:** keep diagnostics; do not bypass the checks.

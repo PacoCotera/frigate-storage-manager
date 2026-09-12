@@ -9,7 +9,7 @@ separate gate in issue #1.
 | Shared configuration mapping | [Supervisor docker/app.py](https://github.com/home-assistant/supervisor/blob/b44b4acbc21768765f70089c90d1a4d9daee5d48/supervisor/docker/app.py) | Public configuration root is supported; private Frigate `/data` is not assumed accessible |
 | Lifecycle role | [Supervisor security allowlist](https://github.com/home-assistant/supervisor/blob/b44b4acbc21768765f70089c90d1a4d9daee5d48/supervisor/api/middleware/security.py) | `manager` is the least available role for discovery and selected `/addons/<slug>/start`/`stop`; `default` only permits info |
 | Ingress | [HA ingress documentation](https://developers.home-assistant.io/docs/apps/presentation/#ingress), [proxy source](https://github.com/home-assistant/supervisor/blob/b44b4acbc21768765f70089c90d1a4d9daee5d48/supervisor/api/ingress.py) | Require peer `172.30.32.2` and authenticated user header; no forwarded-IP trust; allowlist and CSRF supplement sidebar admin setting |
-| Mount validation | [Supervisor mounts API](https://github.com/home-assistant/supervisor/blob/b44b4acbc21768765f70089c90d1a4d9daee5d48/supervisor/api/mounts.py) | Compare active NFS media usage, source and `user_path` with kernel mountinfo; report capacity on that filesystem |
+| Mount validation | [Supervisor mounts API](https://github.com/home-assistant/supervisor/blob/b44b4acbc21768765f70089c90d1a4d9daee5d48/supervisor/api/mounts.py) | Compare active NFS media usage, source and `user_path` with the opened directory's kernel mount ID; report capacity on that descriptor |
 
 No `admin` role, host networking, privileged access, Docker socket, Core API or SSH.
 `sys_options` is Core-only; maintenance requires boot/watchdog/auto-update safeguards
