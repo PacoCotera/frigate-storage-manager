@@ -1,6 +1,7 @@
 name: CI
 on:
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read
@@ -32,6 +33,7 @@ jobs:
         with:
           name: test-results-${{ matrix.os }}
           path: test-results.xml
+          retention-days: 1
   schema-provenance:
     runs-on: ubuntu-latest
     steps:
