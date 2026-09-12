@@ -26,6 +26,8 @@ def test_ingress_validation_preview_and_disabled_delete(env):
     c, headers = client(env)
     assert c.get("/").status_code == 200
     assert c.get("/static/app.js").status_code == 200
+    module = c.get("/static/time.mjs")
+    assert module.status_code == 200 and module.mimetype == "text/javascript"
     assert c.get("/api/discovery").json["apps"][0]["slug"] == SLUG
     response = c.post("/api/validate", json={"target": SLUG}, headers=headers)
     assert response.status_code == 200, response.json

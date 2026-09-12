@@ -4,7 +4,7 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Frigate Storage Manager</title>
   <link rel="stylesheet" href="static/style.css">
-  <script defer src="static/app.js"></script>
+  <script type="module" src="static/app.js"></script>
 </head>
 <body>
 <main>
@@ -34,9 +34,10 @@
     <form id="preview-form">
       <label>Cameras <select id="cameras" multiple size="4" required aria-describedby="camera-help"></select></label>
       <p class="hint" id="camera-help">Historical cameras are included. Use Ctrl/Cmd to select multiple cameras.</p>
-      <div class="controls"><label>Cutoff method<select id="method"><option value="days">Older than days</option><option value="date">Specific date and time</option></select></label>
+      <div class="controls"><label>Cutoff method<select id="method"><option value="days">Older than days</option><option value="hours">Older than hours</option><option value="date">Specific date and time</option></select></label>
         <label id="days-label">Days<input id="days" type="number" min="1" max="36500" value="30" required></label>
-        <label id="date-label" hidden>Local date and time<input id="date" type="datetime-local"></label></div>
+        <label id="hours-label" hidden>Hours<input id="hours" type="number" min="1" max="876000" step="1" value="12" disabled></label>
+        <label id="date-label" hidden>Local date and time<input id="date" type="datetime-local" disabled></label></div>
       <p class="hint" id="boundary"></p>
       <label class="check"><input id="exports" type="checkbox"> Include completed exports, using their creation time</label>
       <p class="hint">Bookmarks, linked history, unfinished items, required footage and in-progress exports are preserved.</p>

@@ -3,7 +3,7 @@
 An independent Home Assistant OS app for validating Frigate storage and previewing
 coherent cleanup of old recordings and associated history, without changing retention.
 
-**0.1.1 is an experimental, installable validation release. Deletion is disabled in
+**0.1.2 is an experimental, installable validation release. Deletion is disabled in
 the shipped code. Actual HAOS installation/access validation is still pending.**
 The full cleanup/recovery engine is implemented and tested with synthetic media and
 SQLite databases. Delivery and live evidence remain tracked in [issue #1](https://github.com/PacoCotera/frigate-storage-manager/issues/1).

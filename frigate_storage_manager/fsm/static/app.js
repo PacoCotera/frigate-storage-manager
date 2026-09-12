@@ -1,4 +1,5 @@
 "use strict";
+import { relativeCutoff } from "./time.mjs";
 const $ = (id) => document.getElementById(id);
 let state = {}, approved = null, validatedTarget = null;
 const labels = {event:"Events",reviewsegment:"Reviews",recordings:"Recording segments",previews:"Preview videos",export:"Completed exports",timeline:"Timeline entries",userreviewstatus:"Review status records",snapshots:"Snapshot files",event_thumbnails:"Event thumbnail files",review_thumbnails:"Review thumbnail files",exports:"Export video files",export_thumbnails:"Export thumbnail files",vec_thumbnails:"Thumbnail vectors",vec_descriptions:"Description vectors",bookmarks:"Bookmarked events",active_events:"Unfinished events",active_reviews:"Unfinished reviews"};
@@ -10,9 +11,9 @@ async function api(path, body){
 }
 function invalidate(){approved=null;$("result-section").hidden=true;$("delete").disabled=true;}
 function cutoff(){
-  if($("method").value==="days"){
-    const days=Number($("days").value);if(!Number.isInteger(days)||days<1||days>36500)throw new Error("Enter a whole number of days between 1 and 36500");
-    return new Date(Date.now()-days*86400000);
+  const method=$("method").value;
+  if(method==="days" || method==="hours"){
+    return relativeCutoff(method,$(method).value);
   }
   const input=$("date").value, value=new Date(input);
   if(!input || Number.isNaN(value.getTime()))throw new Error("Choose a local date and time");
@@ -46,8 +47,8 @@ $("validate").onclick=()=>act(async()=>{
 });
 $("probe").onclick=()=>act(async()=>{const result=await api("probe",{target:validatedTarget});$("diagnostics").textContent+="\n"+JSON.stringify(result,null,2);});
 $("target").onchange=()=>{validatedTarget=null;$("preview").disabled=true;$("probe").disabled=true;invalidate();};
-$("method").onchange=()=>{const date=$("method").value==="date";$("days-label").hidden=date;$("date-label").hidden=!date;$("days").required=!date;$("date").required=date;invalidate();boundary();};
-for(const id of ["days","date","cameras","exports"])$(id).addEventListener("input",()=>{invalidate();boundary();});
+$("method").onchange=()=>{for(const method of ["days","hours","date"]){const active=$("method").value===method;$(method+"-label").hidden=!active;$(method).required=active;$(method).disabled=!active;}invalidate();boundary();};
+for(const id of ["days","hours","date","cameras","exports"])$(id).addEventListener("input",()=>{invalidate();boundary();});
 $("preview-form").onsubmit=(event)=>{event.preventDefault();act(async()=>{
   invalidate();$("preview").disabled=true;
   try{approved=await api("preview",{target:validatedTarget,cameras:[...$("cameras").selectedOptions].map(o=>o.value),cutoff:cutoff().toISOString(),include_exports:$("exports").checked});

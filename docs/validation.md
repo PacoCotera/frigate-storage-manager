@@ -71,3 +71,14 @@ the diagnostic details, displays the actual filesystem and keeps preview/probe
 controls disabled. Lint, formatting and JavaScript syntax checks passed.
 Real NFS access and the explanation for this installation remain to be confirmed
 by rerunning validation with 0.1.1. Deletion remains disabled.
+
+### 0.1.2: hours cutoff
+
+Added **Older than hours** with a 12-hour default and whole-hour precision. Four
+JavaScript tests cover sub-day precision, validation bounds and elapsed time across
+a daylight-saving change; CI runs them on Linux and Windows without npm dependencies.
+Browser QA against a disposable synthetic installation reproduced the user's `0.5`
+Days input, switched to Hours, and completed a 12-hour preview. Changing to 1 hour
+hid the previous result. Switching to a specific date also completed a preview
+despite the inactive invalid Days input. Bookmarks and the deletion lock remained
+visible in both previews. No additional live HAOS access is inferred from this test.

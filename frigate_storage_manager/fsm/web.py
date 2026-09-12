@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+import mimetypes
 import secrets
 import threading
 import time
@@ -18,6 +19,9 @@ from .storage import StorageBlocked, probe_directory
 
 
 def create_app(installation, storage, store, engine):
+    # Browser modules require a JavaScript MIME type, including on hosts whose
+    # MIME registry incorrectly labels .mjs as plain text.
+    mimetypes.add_type("text/javascript", ".mjs")
     app = Flask(__name__)
     app.config.update(MAX_CONTENT_LENGTH=16384)
     secret = secrets.token_bytes(32)  # A restart deliberately expires browser CSRF tokens.

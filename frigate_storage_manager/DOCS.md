@@ -18,7 +18,7 @@ Install from the repository/feature branch in README, start the app and choose
 | `admin_user_ids` | `[]` | HA user IDs authorized for disposable probes and future maintenance. Your ID appears under Validation details. |
 | `max_plan_items` | `10000` | Combined selected-row/file cap, range 100–20000. Choose an earlier cutoff/fewer cameras if exceeded. |
 
-There is **no deletion-enable option** in 0.1.1. Options and environment variables
+There is **no deletion-enable option** in 0.1.2. Options and environment variables
 cannot unlock it. Enablement requires a reviewed release after live validation.
 
 ## Real HAOS checklist
@@ -49,7 +49,11 @@ test**. A real lifecycle and small-cleanup test require later explicit approval.
 
 ## Dates and scope
 
-The page shows browser timezone and UTC boundary. Days mean 24-hour periods. Local
+Choose **Older than hours** for a whole number of hours (minimum 1, default 12),
+**Older than days** for whole days, or **Specific date and time** for a cutoff to
+the minute. For half a day, choose 12 hours. The page shows browser timezone and
+the resulting UTC boundary before previewing. Hours are elapsed 60-minute periods;
+days mean elapsed 24-hour periods, including across daylight-saving changes. Local
 times convert to UTC; nonexistent DST times are rejected, and repeated DST times use
 the first occurrence displayed. End time must be strictly before the cutoff; touching
 and crossing recordings survive. Completed export age uses creation time.
@@ -70,7 +74,7 @@ Unindexed orphan files, training images, faces, models and logs are outside scop
   Different source aliases fail closed. These details include private server/share
   names; redact them before posting publicly, keeping matching values consistent.
   Version 0.1.0 could incorrectly select an `autofs` entry underneath a working NFS
-  mount on Supervisor 2026.09.0. Update this manager to 0.1.1 and revalidate first.
+  mount on Supervisor 2026.09.0. Update this manager to 0.1.1 or later and revalidate first.
   No Frigate restart, share recreation, or server configuration change is needed
   for this app fix. If it still fails, retain the new evidence for investigation.
 - **Probe fails:** inspect permissions/read-only settings. The manager never changes

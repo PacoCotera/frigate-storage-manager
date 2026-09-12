@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2
+
+- Add an Older than hours cutoff with one-hour precision and a 12-hour default.
+- Disable inactive cutoff inputs so an invalid days value cannot block an hours
+  or specific-date preview. Changing the method or hours expires the shown preview.
+- Test relative cutoff precision, bounds and elapsed time across daylight-saving changes.
+- Keep deletion and recovery mutations locked.
+
 ## 0.1.1
 
 - Fix NFS detection for HAOS automounts and stacked mounts by matching the opened

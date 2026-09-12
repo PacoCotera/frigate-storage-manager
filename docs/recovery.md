@@ -1,6 +1,6 @@
 # Recovery and backups
 
-**Cleanup/recovery mutations remain locked in 0.1.1.** This describes the implemented,
+**Cleanup/recovery mutations remain locked in 0.1.2.** This describes the implemented,
 synthetically tested engine for a later validated maintenance release.
 
 ## Interrupted job
