@@ -1,0 +1,37 @@
+name: Frigate Storage Manager
+version: "0.2.1"
+slug: frigate_storage_manager
+description: Preview and safely coordinate Frigate history cleanup and recovery
+url: https://github.com/PacoCotera/frigate-storage-manager
+arch:
+  - amd64
+startup: application
+boot: auto
+init: true
+stage: experimental
+ingress: true
+ingress_port: 8099
+panel_admin: true
+panel_icon: mdi:database-clock
+hassio_api: true
+hassio_role: manager
+map:
+  - type: media
+    read_only: false
+  - type: all_addon_configs
+    path: /addon_configs
+    read_only: false
+options:
+  target_slug: ""
+  database_relative_path: frigate.db
+  media_path: /media/frigate
+  admin_user_ids: []
+  max_plan_items: 10000
+schema:
+  target_slug: str
+  database_relative_path: str
+  media_path: str
+  admin_user_ids:
+    - str
+  max_plan_items: int(100,20000)
+timeout: 120

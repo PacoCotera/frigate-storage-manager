@@ -1,0 +1,75 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: python -m pip install -r requirements-dev.txt
+      - run: python -m ruff check .
+      - run: python -m ruff format --check .
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/test_time.mjs tests/test_overview.mjs tests/test_maintenance.mjs
+      - run: python -m pytest -q --junitxml=test-results.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results-${{ matrix.os }}
+          path: test-results.xml
+          retention-days: 1
+  schema-provenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-dev.txt
+      - uses: actions/checkout@v4
+        with:
+          repository: blakeblackshear/frigate
+          ref: 3d4dd3ac4b00e7257bd3412608a783001d7d77ed
+          path: .upstream
+      - run: python tools/generate_schema.py .upstream
+      - run: git diff --exit-code -- tests/fixtures/frigate-0.17.2.sql frigate_storage_manager/fsm/schema-0.17.2.json
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the same amd64 context Supervisor installs
+        run: docker build --platform linux/amd64 --tag fsm:ci frigate_storage_manager
+      - name: Verify runtime dependencies and maintenance release in image
+        run: >-
+          docker run --rm --entrypoint python fsm:ci -c
+          "import sqlite3; from fsm import DESTRUCTIVE_ENABLED; from fsm.database import load_vectors;
+          from fsm.web import create_app; assert DESTRUCTIVE_ENABLED;
+          db=sqlite3.connect(':memory:'); load_vectors(db); print(db.execute('select vec_version()').fetchone())"
+      - name: Boot the app and verify ingress isolation
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/fsm-data"
+          printf '%s\n' '{"target_slug":"","database_relative_path":"frigate.db","media_path":"/media/frigate","admin_user_ids":[],"max_plan_items":10000}' > "$RUNNER_TEMP/fsm-data/options.json"
+          docker run -d --name fsm-smoke --mount type=bind,source="$RUNNER_TEMP/fsm-data",target=/data fsm:ci
+          trap 'docker logs fsm-smoke; docker rm -f fsm-smoke' EXIT
+          for n in $(seq 1 20); do
+            if docker exec fsm-smoke python -c 'import socket; socket.create_connection(("127.0.0.1",8099),timeout=1).close()'; then break; fi
+            sleep 1
+          done
+          docker exec fsm-smoke python -c 'import urllib.request,urllib.error; exec("try:\n urllib.request.urlopen(\"http://127.0.0.1:8099/api/status\")\n raise AssertionError(\"Ingress was bypassed\")\nexcept urllib.error.HTTPError as e:\n assert e.code==403")'
