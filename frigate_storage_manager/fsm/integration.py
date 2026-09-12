@@ -17,6 +17,10 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise Blocked("API redirects are not permitted")
 
 
+class SupervisorNotRunning(Blocked):
+    """Positive, target-bound Supervisor evidence; never a connection failure."""
+
+
 class Supervisor:
     def __init__(self, token=None):
         self.token = token if token is not None else os.environ.get("SUPERVISOR_TOKEN", "")
@@ -44,11 +48,35 @@ class Supervisor:
             if frigate and path == "/api/version":
                 return body.decode().strip().strip('"')
             result = json.loads(body)
+        except urllib.error.HTTPError as exc:
+            # Supervisor 2026.09.0 app.stats distinguishes a stopped/missing
+            # container from failed stats IO. Its error state alone cannot:
+            # both nonzero exits and failed stop operations produce "error".
+            try:
+                with exc:
+                    body = exc.read(8193)
+                failure = json.loads(body) if len(body) <= 8192 else {}
+                fields = failure.get("extra_fields", {}) if isinstance(failure, dict) else {}
+                app = fields.get("app") if isinstance(fields, dict) else None
+                not_running = (
+                    not frigate
+                    and not action
+                    and exc.code == 400
+                    and isinstance(app, str)
+                    and path == f"/addons/{app}/stats?one_shot=true"
+                    and failure.get("result") == "error"
+                    and failure.get("error_key") == "app_not_running_error"
+                )
+            except (ValueError, OSError):
+                not_running = False
+            if not_running:
+                raise SupervisorNotRunning("Supervisor confirmed the app is not running") from None
+            raise Blocked("Selected service API is unavailable or refused the request") from None
         except (urllib.error.URLError, TimeoutError, ValueError, OSError):
             raise Blocked("Selected service API is unavailable or refused the request") from None
         if frigate:
             return result
-        if result.get("result") != "ok":
+        if not isinstance(result, dict) or result.get("result") != "ok":
             raise Blocked("Supervisor did not confirm the operation")
         return result.get("data", {})
 
@@ -66,7 +94,26 @@ class Supervisor:
         return result
 
     def info(self, slug):
-        return self.request(f"/addons/{identifier(slug)}/info")
+        slug = identifier(slug)
+        path = f"/addons/{slug}"
+        info = self.request(path + "/info")
+        if slug == "self" or info.get("state") != "error":
+            return info
+        try:
+            self.request(path + "/stats?one_shot=true")
+        except SupervisorNotRunning:
+            # Re-read after the stats check: do not hide a concurrent start.
+            current = self.request(path + "/info")
+            if current.get("state") in ("error", "stopped"):
+                return current | {
+                    "state": "stopped",
+                    "reported_state": info["state"],
+                    "stop_verified": True,
+                }
+            return current
+        except Blocked:
+            pass
+        return info  # Unknown failure or live stats are never stopped evidence.
 
     def lifecycle(self, slug, action):
         if action not in ("start", "stop"):
@@ -180,7 +227,12 @@ class Installation:
         ):
             if info.get(key) != expected or (expected is False and info.get(key) is not False):
                 blockers.append(f"Turn off Frigate {label} in its Home Assistant app settings.")
-        if info.get("state") not in ("started", "stopped"):
+        if info.get("state") == "error":
+            blockers.append(
+                "Supervisor reports a Frigate error but has not confirmed it stopped. "
+                "Check Frigate's app logs, then validate again."
+            )
+        elif info.get("state") not in ("started", "stopped"):
             blockers.append("Wait for Frigate to reach a stable started or stopped state.")
         own = self.supervisor.info("self")
         if not own.get("hassio_api") or own.get("hassio_role") != "manager":

@@ -1,5 +1,5 @@
 name: Frigate Storage Manager
-version: "0.2.0"
+version: "0.2.1"
 slug: frigate_storage_manager
 description: Preview and safely coordinate Frigate history cleanup and recovery
 url: https://github.com/PacoCotera/frigate-storage-manager

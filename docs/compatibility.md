@@ -16,6 +16,25 @@ No `admin` role, host networking, privileged access, Docker socket, Core API or 
 already configured in HA. Lost lifecycle responses are followed by state verification.
 The Dockerfile uses an explicit pinned base/labels, not legacy `build.yaml` fallback.
 
+### Supervisor 2026.09.0 exit-error state
+
+The pinned [app state and stats implementation](https://github.com/home-assistant/supervisor/blob/2026.09.0/supervisor/apps/app.py)
+sets `error` for both a nonzero container exit and an unsuccessful stop operation.
+Consequently `error` alone is not proof that Frigate stopped. Version 0.2.1 calls
+the supported read-only `/addons/<slug>/stats?one_shot=true` endpoint only for this
+ambiguous state. A strict HTTP 400 `result:error`, `error_key:app_not_running_error`
+and matching `extra_fields.app` confirm the selected container is not running;
+these fields come from [AppNotRunningError](https://github.com/home-assistant/supervisor/blob/2026.09.0/supervisor/exceptions.py)
+and the [API error serializer](https://github.com/home-assistant/supervisor/blob/2026.09.0/supervisor/api/utils.py).
+The existing [manager role permits this endpoint](https://github.com/home-assistant/supervisor/blob/2026.09.0/supervisor/api/middleware/security.py).
+
+The manager then re-reads app info, retains the raw error label in diagnostics, and
+uses stopped state only while the evidence agrees. Evidence is never cached across
+guards or recovery. Live/empty stats, unavailable APIs, timeouts, mismatched targets,
+unknown states and unstructured/other errors cannot establish stopped state. No new
+permissions or direct container access are required. Older Supervisor versions
+without this structured response remain blocked for ambiguous error states.
+
 ## Frigate 0.17.2 contract
 
 Pinned source: `3d4dd3ac4b00e7257bd3412608a783001d7d77ed`.

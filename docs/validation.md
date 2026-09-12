@@ -1,5 +1,27 @@
 # Validation evidence and remaining gates
 
+## 0.2.1: Supervisor exit-error stop verification
+
+Live feedback reports Frigate showing `error` after stopping, preventing cleanup
+authorization. Supervisor 2026.09.0 source confirms that this label can mean either
+a nonzero exit or a failed lifecycle operation. The manager now requires a structured,
+target-specific not-running response from Supervisor's read-only stats API, followed
+by a fresh app-info read, to accept an error-labelled app as stopped.
+
+New HTTP-transport and worker regressions cover accepted stop evidence, lost stop
+responses, running-but-idle containers, errors/timeouts/malformed responses, target
+mismatch, concurrent starts, uncached evidence, selected cleanup, full reset, and
+before/after-commit recovery preserving original state. The UI fixture can reproduce
+the status with `--cleanup --supervisor-exit-error`. No live deletion is performed
+by these tests; the user must validate the updated manager on HAOS. Final CI results
+are recorded in issue #1 and PR #2.
+
+Local validation: 241 Python tests passed with seven platform/privilege skips;
+all 11 JavaScript tests, lint, formatting and syntax checks passed. Browser QA
+using the synthetic Supervisor transport displayed the verified-stopped explanation,
+enabled full-reset preparation after validation, and enabled selected-history
+deletion after preview while preserving the bookmark group in the result.
+
 Implementation follows [issue #1](https://github.com/PacoCotera/frigate-storage-manager/issues/1).
 
 ## Automated evidence

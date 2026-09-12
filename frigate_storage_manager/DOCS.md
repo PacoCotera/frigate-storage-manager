@@ -52,6 +52,22 @@ verification before media/database changes. No additional release unlock is requ
 
 ## Delete selected history
 
+### Frigate shows `error` after stopping
+
+Version **0.2.1** handles a Supervisor exit-error status when its read-only stats
+endpoint explicitly confirms the selected app is not running. Click **Validate
+connection** again after updating the manager. The connection then shows
+**Stopped (Supervisor reports an exit error; verified not running)**, and the exit
+label no longer blocks maintenance. The worker repeats the check before touching
+history and throughout recovery. Generic API errors, timeouts and unknown states
+remain blocked; they do not prove Frigate stopped.
+
+You can leave Frigate running and let the manager stop it after confirmation.
+If it is already stopped, it stays stopped after the operation. Effective settings
+must have been validated once while Frigate was running, with unchanged configuration.
+
+### Steps
+
 1. Add your HA user ID to `admin_user_ids` and restart this manager if not already done.
 2. In the selected **Frigate** app's Info page, turn off **Start on boot**, **Watchdog**
    and **Auto update**. Leave Frigate running. The manager cannot change these Core-only

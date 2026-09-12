@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.1
+
+- Handle Frigate exiting with Supervisor state `error` after a manual or manager stop.
+  Require a target-specific, structured Supervisor `app_not_running_error` from
+  the read-only stats endpoint before treating that state as stopped; re-read
+  state after the check and repeat verification throughout maintenance/recovery.
+- Show "Stopped (Supervisor reports an exit error; verified not running)" after
+  validation. Unknown states, live stats, timeouts and generic errors still block.
+- Preserve the original running state for selected cleanup and full reset, including
+  recovery and lost stop responses. A start still requires `started` confirmation.
+
 ## 0.2.0
 
 - Enable explicitly confirmed maintenance after live discovery/preview validation

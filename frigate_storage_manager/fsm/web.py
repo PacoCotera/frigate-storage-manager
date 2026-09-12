@@ -180,6 +180,8 @@ def create_app(installation, storage, store, engine):
             target=slug,
             version=info["version"],
             state=info["state"],
+            reported_state=info.get("reported_state", info["state"]),
+            stop_verified=info.get("stop_verified", False),
             database=str(db_path),
             media=evidence,
             cameras=cameras,

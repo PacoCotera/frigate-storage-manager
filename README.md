@@ -3,7 +3,7 @@
 An independent Home Assistant OS app for previewing and deleting Frigate recordings
 and associated history, without changing retention. Includes a separate full reset.
 
-**0.2.0 enables experimental cleanup and full reset for explicitly authorized users.**
+**0.2.1 supports experimental cleanup and full reset for explicitly authorized users.**
 Live discovery, NFS validation and previews have worked, and the operator has authorized
 the first destructive test. Write access, lifecycle, cleanup and recovery are tested
 with synthetic media/databases but remain unvalidated on the real HAOS installation.

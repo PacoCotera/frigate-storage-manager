@@ -21,6 +21,9 @@ from waitress import serve
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--cleanup", action="store_true", help="Authorize synthetic cleanup in the UI")
 parser.add_argument(
+    "--supervisor-exit-error", action="store_true", help="Simulate a verified stopped/error app"
+)
+parser.add_argument(
     "--unsafe-boot", action="store_true", help="Show required Frigate setting changes"
 )
 parser.add_argument(
@@ -49,6 +52,17 @@ with tempfile.TemporaryDirectory(prefix="fsm-ui-") as temp:
         data.installation.options["admin_user_ids"] = ["fixture-admin"]
     if args.unsafe_boot:
         data.supervisor.app.update(boot="auto", watchdog=True, auto_update=True)
+    if args.supervisor_exit_error:
+        from types import SimpleNamespace
+
+        from fsm.integration import Supervisor
+        from test_supervisor_state import SupervisorTransport
+
+        transport = SupervisorTransport(data.supervisor)
+        transport.fake.app["state"], transport.running = "error", False
+        data.supervisor = Supervisor("synthetic-token")
+        data.supervisor.opener = SimpleNamespace(open=transport.open)
+        data.installation.supervisor = data.supervisor
     if args.cleanup_delay:
         data.engine.hook = (
             lambda phase: time.sleep(args.cleanup_delay)

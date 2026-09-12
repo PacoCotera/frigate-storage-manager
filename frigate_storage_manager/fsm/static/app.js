@@ -67,7 +67,7 @@ async function refreshStatus(){
 async function act(fn){$("error").hidden=true;try{await fn();}catch(e){error(e);}}
 $("validate").onclick=()=>act(async()=>{
   checking=true;invalidate();validatedTarget=null;maintenance=null;syncControls();$("diagnostics").textContent="Validation in progress…";$("connection").textContent="Validating selected database, schema, NFS and Supervisor access…";
-  try{const data=await api("validate",{target:$("target").value});validatedTarget=data.target;$("connection").textContent=`${data.target} · Frigate ${data.version} · ${data.state} · NFS available`;
+  try{const data=await api("validate",{target:$("target").value});validatedTarget=data.target;$("connection").textContent=`${data.target} · Frigate ${data.version} · ${data.stop_verified?"Stopped (Supervisor reports an exit error; verified not running)":data.state} · NFS available`;
     maintenance=data.maintenance;$("maintenance-status").textContent=maintenance.ready?"Cleanup prerequisites are ready. Write, rename and delete checks run automatically before Frigate stops.":maintenance.blockers.join(" ")+" Then validate again. Previews remain available.";
     for(const key of ["used","free","total"])$(key).textContent=bytes(data.media[key]);$("storage").hidden=false;$("diagnostics").textContent=JSON.stringify(data,null,2);
     $("cameras").replaceChildren();for(const name of data.cameras){const option=document.createElement("option");option.value=name;option.textContent=name+(data.historical_cameras.includes(name)?" (historical)":"");option.selected=true;$("cameras").append(option);}$("preview").disabled=state.recovery_required;$("probe").disabled=!state.is_admin;
